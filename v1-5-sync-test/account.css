@@ -1,0 +1,30 @@
+/* THREADLINE V1.4 — account menu and cloud sync settings */
+#tl-account-root{position:relative;display:inline-flex;align-items:center;flex-shrink:0}
+.tl-account-trigger{display:flex;align-items:center;gap:8px;border:1px solid #e3e7de;background:#fffefa;color:#294231;border-radius:50px;padding:5px 10px 5px 5px;font:700 11px Inter,system-ui,sans-serif;cursor:pointer;min-height:39px}
+.tl-account-trigger:hover{border-color:#8da68c}
+.tl-avatar{display:grid;place-items:center;width:27px;height:27px;background:#dfe9dd;color:#294331;border-radius:50%;font-size:12px;font-weight:900}
+.tl-avatar.signed{background:#304c38;color:#fff}
+#tl-account-dropdown{position:absolute;right:0;top:calc(100% + 11px);z-index:600;width:min(390px,calc(100vw - 28px));border:1px solid #dce3da;background:#fffefa;border-radius:17px;box-shadow:0 18px 55px #24362c25;max-height:min(82vh,720px);overflow:auto;padding:17px;text-align:left}
+#tl-account-dropdown[hidden]{display:none}
+.tl-account-title{font:normal 22px/1.15 Georgia,serif;color:#29382c}
+.tl-account-sub{color:#758173;font-size:11px;margin-top:6px;overflow-wrap:anywhere}
+.tl-account-section{margin-top:16px;padding-top:15px;border-top:1px solid #e6e9e1}
+.tl-account-heading{font-size:9px;letter-spacing:.15em;font-weight:800;text-transform:uppercase;color:#829080;margin-bottom:10px}
+.tl-account-action{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid #e0e6dc;background:#fffefa;color:#27382c;text-decoration:none;border-radius:10px;padding:10px 12px;font:700 12px Inter,system-ui,sans-serif;cursor:pointer;margin:7px 0}
+.tl-account-action:hover{border-color:#98af96;background:#f5f8f3}
+.tl-account-action.primary{background:#263b30;color:#fff;border-color:#263b30}
+.tl-account-action:disabled{opacity:.5;cursor:wait}
+.tl-account-text{font-size:11px;line-height:1.6;color:#6e7b70}
+.tl-account-status{background:#edf4ea;padding:10px 11px;border-radius:10px;color:#3a613f;font-size:11px;line-height:1.5;margin-top:12px}
+.tl-account-status.error{background:#fff0ec;color:#9c4933}
+.tl-account-connected{display:inline-flex;padding:5px 8px;border-radius:15px;background:#e6eee3;color:#3a5a3b;font-size:10px;font-weight:700}
+#tl-account-cloud-slot #threadline-cloud{position:static;display:block;background:none;border:0;border-radius:0;padding:0;margin:0;box-shadow:none}
+#tl-account-cloud-slot .tl-cloud-head{display:block}
+#tl-account-cloud-slot .tl-cloud-head>span{font-size:11px}
+#tl-account-cloud-slot .tl-cloud-actions{display:grid;grid-template-columns:1fr 1fr;margin-top:10px;gap:6px}
+#tl-account-cloud-slot .tl-cloud-actions .btn{white-space:normal;min-height:36px;padding:7px 8px;font-size:10px}
+#tl-account-cloud-slot .tl-cloud-actions .btn[data-cloud="upload"]{border-color:#e5c6ab;color:#a35b36}
+#tl-account-cloud-slot .tl-cloud-head>div>strong{display:none}
+#tl-account-cloud-slot .tl-cloud-sub{margin-top:4px}
+#tl-account-cloud-slot .tl-cloud-head .tl-cloud-error{margin-top:7px}
+@media(max-width:700px){.top-actions .demo-flag{display:none}.tl-account-trigger{padding-right:6px}.tl-account-trigger .tl-trigger-text{display:none}#tl-account-dropdown{right:-2px;width:min(370px,calc(100vw - 22px));max-height:70vh}}
