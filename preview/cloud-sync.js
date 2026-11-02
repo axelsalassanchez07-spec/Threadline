@@ -11,7 +11,7 @@
   const DIRTY_KEY = 'threadline_preview_cloud_dirty_v1';
   const LAST_SYNC_KEY = 'threadline_preview_cloud_last_sync_v1';
   const stores = ['items', 'inspos', 'saved', 'feedback', 'prefs'];
-  const guard = { client:null, user:null, linked:false, busy:false, applying:false, error:'', status:'Cloud not connected', lastRemote:null, timer:null, job:Promise.resolve(), photoCache:new Map() };
+  const guard = { client:null, user:null, linked:false, busy:false, applying:false, error:'', status:'Cloud not connected', lastRemote:null, timer:null, job:Promise.resolve(), photoCache:new Map(), revision:0, allowReplaceOnce:false };
 
   const html = value => String(value ?? '').replace(/[&<>"']/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const status = message => { guard.status = message; showToolbar(); };
@@ -40,6 +40,7 @@
 
   function markDirty(){
     if (guard.applying || !guard.user || !guard.linked) return;
+    guard.revision++;
     localSet(DIRTY_KEY,'1');
     status('Changes not yet synced');
     clearTimeout(guard.timer);
@@ -72,9 +73,11 @@
       const blob = await (await fetch(dataUrl)).blob();
       const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
       const hex = [...new Uint8Array(digest)].slice(0,12).map(x=>x.toString(16).padStart(2,'0')).join('');
-      const name = `${guard.user.id}/${group}/${encodeURIComponent(String(row.id))}-${hex}.jpg`;
+      const mime = ['image/jpeg','image/png','image/webp'].includes(blob.type) ? blob.type : 'image/jpeg';
+      const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
+      const name = `${guard.user.id}/${group}/${encodeURIComponent(String(row.id))}-${hex}.${ext}`;
       if (!guard.photoCache.has(name)){
-        const {error} = await guard.client.storage.from(BUCKET).upload(name, blob, {contentType:'image/jpeg',upsert:true});
+        const {error} = await guard.client.storage.from(BUCKET).upload(name, blob, {contentType:mime,upsert:true});
         if (error) throw new Error(`Photo upload failed (${group}): ${error.message}`);
         guard.photoCache.set(name,true);
       }
@@ -96,17 +99,26 @@
     if (!guard.user || !guard.linked || guard.applying) return;
     guard.busy = true; guard.error=''; status('Uploading changes…');
     try {
+      const before = guard.revision;
       const data = await makeCloudData();
-      const result = await guard.client.from('threadline_state').upsert({user_id:guard.user.id,data,updated_at:new Date().toISOString()},{onConflict:'user_id'});
+      // Prevent an out-of-date browser from silently replacing a newer cloud snapshot.
+      const remote = await fetchCloud();
+      if (remote?.updated_at && !guard.allowReplaceOnce && (!guard.lastRemote || new Date(remote.updated_at).getTime() > new Date(guard.lastRemote).getTime() + 1000)) {
+        throw new Error('Newer cloud data exists. Use Restore cloud → this device or explicitly choose Replace cloud with this device.');
+      }
+      const updatedAt = new Date().toISOString();
+      const result = await guard.client.from('threadline_state').upsert({user_id:guard.user.id,data,updated_at:updatedAt},{onConflict:'user_id'});
       if (result.error) throw result.error;
-      localDelete(DIRTY_KEY);
-      localSet(LAST_SYNC_KEY,new Date().toISOString());
+      guard.lastRemote = updatedAt;
+      if (guard.revision === before) localDelete(DIRTY_KEY);
+      else { localSet(DIRTY_KEY,'1'); clearTimeout(guard.timer); guard.timer=setTimeout(()=>{void scheduleUpload()},1500); }
+      localSet(LAST_SYNC_KEY,updatedAt);
       status('Synced across your devices');
     } catch (e){
       guard.error = e.message || String(e);
       localSet(DIRTY_KEY,'1');
       status('Could not sync · data remains in this browser');
-    } finally {guard.busy=false;showToolbar();}
+    } finally {guard.allowReplaceOnce=false;guard.busy=false;showToolbar();}
   }
   function scheduleUpload(){
     // Serialize uploads: one record per user, never let an earlier save finish after a newer one.
@@ -147,6 +159,7 @@
       shopState.inspirationId=shop.inspirationId||'';
       hooks.originalShopStore();
       await refresh(); state.generated=[];
+      guard.lastRemote=row.updated_at||null;
       guard.linked=true;localSet(LINKED_KEY,guard.user.id);localDelete(DIRTY_KEY);localSet(LAST_SYNC_KEY,new Date().toISOString());
       status('Cloud wardrobe loaded');render();
     } catch(e){guard.error=e.message||String(e);status('Cloud restore failed · local data unchanged where possible');}
@@ -158,7 +171,14 @@
     guard.error='';
     guard.linked=!!user&&localGet(LINKED_KEY)===user.id;
     if (!user){status('Local mode — sign in to sync');return;}
-    status(guard.linked?'Checking your cloud data…':'Choose which wardrobe to keep first');
+    status(guard.linked?'Checking your cloud data…':'Checking for a saved cloud wardrobe…');
+    if(!guard.linked){
+      try{
+        const remote=await fetchCloud();
+        guard.lastRemote=remote?.updated_at||null;
+        status(remote?.data?'Cloud wardrobe found — use saved cloud data on this device':'No cloud wardrobe yet — upload this browser to start');
+      }catch(e){guard.error=e.message||String(e);status('Could not check cloud wardrobe');}
+    }
     // On a known device, always fetch the latest cloud data, unless local changes failed to sync.
     if(guard.linked){
       if(localGet(DIRTY_KEY)==='1') {status('Unsynced local changes — choose which version to keep');return;}
@@ -189,7 +209,7 @@
           await doDownload();
         }else if(name==='upload'){
           if(!confirm('Replace the existing THREADLINE cloud snapshot with the contents of this browser? This may overwrite edits made on another device.'))return;
-          guard.linked=true;localSet(LINKED_KEY,guard.user.id);localSet(DIRTY_KEY,'1');
+          guard.linked=true;guard.allowReplaceOnce=true;localSet(LINKED_KEY,guard.user.id);localSet(DIRTY_KEY,'1');
           await scheduleUpload();
         }else if(name==='sync'){
           localSet(DIRTY_KEY,'1');await scheduleUpload();
