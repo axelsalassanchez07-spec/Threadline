@@ -1,0 +1,218 @@
+/* THREADLINE cloud sync (opt-in). Browser-only JS, backed by Supabase Auth, Database + private Storage.
+ * Frontend contains only public project URL and publishable key. No secrets or privileged credentials.
+ * First migration is a deliberate action, never an automatic overwrite.
+ */
+(() => {
+  'use strict';
+  const PROJECT_URL = 'https://vkyzbsxabwhplpuctajz.supabase.co';
+  const PUBLISHABLE_KEY = 'sb_publishable_aK72PAYSXalQd04SIeGTPw_F2Dqaw5P';
+  const BUCKET = 'threadline-images';
+  const LINKED_KEY = 'threadline_cloud_linked_user_v1';
+  const DIRTY_KEY = 'threadline_cloud_dirty_v1';
+  const LAST_SYNC_KEY = 'threadline_cloud_last_sync_v1';
+  const stores = ['items', 'inspos', 'saved', 'feedback', 'prefs'];
+  const guard = { client:null, user:null, linked:false, busy:false, applying:false, error:'', status:'Cloud not connected', lastRemote:null, timer:null, job:Promise.resolve(), photoCache:new Map() };
+
+  const html = value => String(value ?? '').replace(/[&<>"']/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const status = message => { guard.status = message; showToolbar(); };
+  const localGet = k => {try{return localStorage.getItem(k)}catch{return null}};
+  const localSet = (k,v) => {try{localStorage.setItem(k,v)}catch{}};
+  const localDelete = k => {try{localStorage.removeItem(k)}catch{}};
+  const syncTime = value => value ? new Date(value).toLocaleString() : 'Not yet synced';
+  const isDataImage = value => typeof value === 'string' && /^data:image\/(jpeg|png|webp);base64,/i.test(value);
+
+  function showToolbar(){
+    const root = document.getElementById('threadline-cloud');
+    if (!root) return;
+    if (!guard.client) {
+      root.innerHTML = '<div class="tl-cloud-head"><strong>☁ Cloud sync</strong><span>Cloud library unavailable. THREADLINE still works locally.</span></div>';
+      return;
+    }
+    const buttons = !guard.user
+      ? '<button class="btn btn-primary btn-small" data-cloud="login">Sign in with GitHub</button>'
+      : guard.linked
+        ? '<button class="btn btn-ghost btn-small" data-cloud="download">Restore cloud → this device</button><button class="btn btn-ghost btn-small" data-cloud="upload">Replace cloud with this device</button><button class="btn btn-primary btn-small" data-cloud="sync">Sync now</button><button class="btn btn-ghost btn-small" data-cloud="logout">Sign out</button>'
+        : '<button class="btn btn-primary btn-small" data-cloud="download">Use saved cloud data</button><button class="btn btn-ghost btn-small" data-cloud="upload">Use this browser’s data</button><button class="btn btn-ghost btn-small" data-cloud="logout">Sign out</button>';
+    const current = guard.user ? `Signed in · ${html(guard.user.email || guard.user.user_metadata?.user_name || 'GitHub account')}` : 'Not signed in · local data only';
+    root.innerHTML = `<div class="tl-cloud-head"><div><strong>☁ Cloud sync</strong><div class="tl-cloud-sub">${current} · ${html(guard.status)}</div>${guard.linked?`<div class="tl-cloud-sub">Last successful sync: ${html(syncTime(localGet(LAST_SYNC_KEY)))}</div>`:''}${guard.error?`<div class="tl-cloud-error">${html(guard.error)}</div>`:''}</div><div class="tl-cloud-actions">${buttons}</div></div>`;
+    root.querySelectorAll('button').forEach(button => button.disabled = guard.busy);
+  }
+
+  function markDirty(){
+    if (guard.applying || !guard.user || !guard.linked) return;
+    localSet(DIRTY_KEY,'1');
+    status('Changes not yet synced');
+    clearTimeout(guard.timer);
+    guard.timer = setTimeout(() => { void scheduleUpload(); }, 1100);
+  }
+  function installWriteHooks(){
+    const originalWrite = write, originalDrop = drop, originalReset = resetStore, originalShopStore = shopStore;
+    write = async (...args) => {let result = await originalWrite(...args); markDirty(); return result;};
+    drop = async (...args) => {let result = await originalDrop(...args); markDirty(); return result;};
+    resetStore = async (...args) => {let result = await originalReset(...args); markDirty(); return result;};
+    shopStore = (...args) => {let result = originalShopStore(...args); markDirty(); return result;};
+    return {originalWrite,originalDrop,originalReset,originalShopStore};
+  }
+  let hooks;
+  function storedSnapshot(){
+    return {
+      schemaVersion:1,
+      items:state.items.filter(x=>!x.demo).map(x=>({...x})),
+      inspos:state.inspos.map(x=>({...x})),
+      saved:state.saved.map(x=>({...x})),
+      feedback:state.feedback.map(x=>({...x})),
+      prefs:{...state.prefs},
+      shoppingV11:{swaps:{...shopState.swaps},ownedProductIds:[...shopState.ownedProductIds],saved:[...shopState.saved],budget:shopState.budget,inspirationId:shopState.inspirationId,ratings:[...shopState.ratings]}
+    };
+  }
+  async function turnPhotoIntoPath(obj, group){
+    const row = {...obj};
+    if (isDataImage(row.image)){
+      const dataUrl = row.image;
+      const blob = await (await fetch(dataUrl)).blob();
+      const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+      const hex = [...new Uint8Array(digest)].slice(0,12).map(x=>x.toString(16).padStart(2,'0')).join('');
+      const name = `${guard.user.id}/${group}/${encodeURIComponent(String(row.id))}-${hex}.jpg`;
+      if (!guard.photoCache.has(name)){
+        const {error} = await guard.client.storage.from(BUCKET).upload(name, blob, {contentType:'image/jpeg',upsert:true});
+        if (error) throw new Error(`Photo upload failed (${group}): ${error.message}`);
+        guard.photoCache.set(name,true);
+      }
+      row.cloudImagePath = name;
+    }
+    // Never put private signed URLs or base64 photo data in the JSON database record.
+    row.image = '';
+    return row;
+  }
+  async function makeCloudData(){
+    // Re-read persisted changes; don't race the caller's refresh() after form submission.
+    await refresh();
+    const snapshot = storedSnapshot();
+    snapshot.items = await Promise.all(snapshot.items.map(x=>turnPhotoIntoPath(x,'wardrobe')));
+    snapshot.inspos = await Promise.all(snapshot.inspos.map(x=>turnPhotoIntoPath(x,'inspiration')));
+    return snapshot;
+  }
+  async function doUpload(){
+    if (!guard.user || !guard.linked || guard.applying) return;
+    guard.busy = true; guard.error=''; status('Uploading changes…');
+    try {
+      const data = await makeCloudData();
+      const result = await guard.client.from('threadline_state').upsert({user_id:guard.user.id,data,updated_at:new Date().toISOString()},{onConflict:'user_id'});
+      if (result.error) throw result.error;
+      localDelete(DIRTY_KEY);
+      localSet(LAST_SYNC_KEY,new Date().toISOString());
+      status('Synced across your devices');
+    } catch (e){
+      guard.error = e.message || String(e);
+      localSet(DIRTY_KEY,'1');
+      status('Could not sync · data remains in this browser');
+    } finally {guard.busy=false;showToolbar();}
+  }
+  function scheduleUpload(){
+    // Serialize uploads: one record per user, never let an earlier save finish after a newer one.
+    guard.job = guard.job.then(doUpload, doUpload);
+    return guard.job;
+  }
+  async function fetchCloud(){
+    const {data,error} = await guard.client.from('threadline_state').select('data,updated_at').eq('user_id',guard.user.id).maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+  async function hydrateRow(row){
+    const copy = {...row};
+    if (copy.cloudImagePath){
+      const {data,error}=await guard.client.storage.from(BUCKET).createSignedUrl(copy.cloudImagePath, 60*60*24*7);
+      if (error) throw new Error(`Photo access failed: ${error.message}`);
+      copy.image = data.signedUrl;
+    }
+    return copy;
+  }
+  async function doDownload(){
+    guard.busy=true;guard.applying=true;guard.error='';status('Restoring cloud backup…');
+    try{
+      const row = await fetchCloud();
+      if (!row?.data || !Array.isArray(row.data.items)) throw new Error('No cloud wardrobe found. Choose “Use this browser’s data” to create your first backup.');
+      const data = row.data;
+      const items = await Promise.all(data.items.map(hydrateRow));
+      const inspos = await Promise.all((data.inspos||[]).map(hydrateRow));
+      for (const store of stores) await hooks.originalReset(store);
+      for (const [store,rows] of [['items',items],['inspos',inspos],['saved',data.saved||[]],['feedback',data.feedback||[]]]){
+        for (const obj of rows) if(obj && typeof obj.id === 'string') await hooks.originalWrite(store,obj);
+      }
+      await hooks.originalWrite('prefs',{...defaultPrefs,...(data.prefs||{}),id:'user'});
+      const shop = data.shoppingV11 || {};
+      shopState.swaps=shop.swaps||{};shopState.ownedProductIds=shop.ownedProductIds||[];
+      shopState.saved=shop.saved||[];shopState.ratings=shop.ratings||[];
+      shopState.budget=Number.isFinite(shop.budget)?shop.budget:250;
+      shopState.inspirationId=shop.inspirationId||'';
+      hooks.originalShopStore();
+      await refresh(); state.generated=[];
+      guard.linked=true;localSet(LINKED_KEY,guard.user.id);localDelete(DIRTY_KEY);localSet(LAST_SYNC_KEY,new Date().toISOString());
+      status('Cloud wardrobe loaded');render();
+    } catch(e){guard.error=e.message||String(e);status('Cloud restore failed · local data unchanged where possible');}
+    finally{guard.busy=false;guard.applying=false;showToolbar();}
+  }
+  async function attachUser(user){
+    clearTimeout(guard.timer);
+    guard.user=user;
+    guard.error='';
+    guard.linked=!!user&&localGet(LINKED_KEY)===user.id;
+    if (!user){status('Local mode — sign in to sync');return;}
+    status(guard.linked?'Checking your cloud data…':'Choose which wardrobe to keep first');
+    // On a known device, always fetch the latest cloud data, unless local changes failed to sync.
+    if(guard.linked){
+      if(localGet(DIRTY_KEY)==='1') {status('Unsynced local changes — choose which version to keep');return;}
+      await doDownload();
+    }
+  }
+  async function begin(){
+    const root=document.createElement('section');
+    root.id='threadline-cloud';root.setAttribute('aria-label','Private cloud synchronization');
+    document.querySelector('.topline')?.insertAdjacentElement('afterend',root);
+    if (!window.supabase?.createClient){showToolbar();return;}
+    guard.client=window.supabase.createClient(PROJECT_URL,PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+    hooks=installWriteHooks();
+    showToolbar();
+    document.getElementById('threadline-cloud').addEventListener('click',async event=>{
+      const name=event.target.closest('[data-cloud]')?.dataset.cloud;
+      if(!name||guard.busy)return;
+      try{
+        if(name==='login'){
+          const {error}=await guard.client.auth.signInWithOAuth({provider:'github',options:{redirectTo:location.origin+location.pathname}});
+          if(error)throw error;
+        }else if(name==='logout'){
+          if(!confirm('Sign out? Your cloud backup remains saved; this browser may still have local data.'))return;
+          const {error}=await guard.client.auth.signOut();if(error)throw error;
+          await attachUser(null);
+        }else if(name==='download'){
+          if(!confirm('Replace this browser’s THREADLINE wardrobe, inspiration, saved outfits and preferences with your cloud version? Export a local backup first if needed.'))return;
+          await doDownload();
+        }else if(name==='upload'){
+          if(!confirm('Replace the existing THREADLINE cloud snapshot with the contents of this browser? This may overwrite edits made on another device.'))return;
+          guard.linked=true;localSet(LINKED_KEY,guard.user.id);localSet(DIRTY_KEY,'1');
+          await scheduleUpload();
+        }else if(name==='sync'){
+          localSet(DIRTY_KEY,'1');await scheduleUpload();
+        }
+      }catch(e){guard.error=e.message||String(e);status('Cloud action failed');}
+    });
+    const {data,error}=await guard.client.auth.getUser();
+    if(error){status('Local mode — sign in to sync');return;}
+    await attachUser(data?.user||null);
+    guard.client.auth.onAuthStateChange((event,session)=>{
+      if(event==='SIGNED_OUT'){void attachUser(null);}
+      // OAuth callback reloads the page; getUser above loads an authenticated user on boot.
+      if(event==='SIGNED_IN' && !guard.user) setTimeout(()=>{void guard.client.auth.getUser().then(({data})=>attachUser(data?.user||null));},0);
+    });
+  }
+  // Existing inline app script has already started its async init().
+  // UI injection doesn't depend on the local DB, but cloud loads wait for init to finish.
+  const originalInit=init;
+  let appInitDone=false;
+  init=async (...args)=>{await originalInit(...args);appInitDone=true;};
+  const startup=async()=>{
+    for(let i=0;i<80&&!document.getElementById('view')?.innerHTML;i++)await new Promise(r=>setTimeout(r,50));
+    await begin();
+  };
+  void startup().catch(err=>{console.error('THREADLINE cloud initialization:',err);});
+})();
