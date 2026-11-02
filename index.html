@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#f7f6f2">
   <meta name="description" content="THREADLINE — a personal styling studio with true wardrobe ownership, inspiration-guided discovery, and real product references.">
-  <title>THREADLINE V1.3 Preview — Cloud sync</title>
+  <title>THREADLINE V1.4 — Your personal style studio</title>
+<link rel="stylesheet" href="account.css">
   <style>
 
 :root{--bg:#f7f6f2;--paper:#fffefa;--ink:#202720;--muted:#737b73;--muted2:#9ba29a;--line:#e5e7df;--sage:#748675;--light-sage:#e8eee7;--orange:#b96843;--orange-pale:#f5e8df;--dark:#26332a;--shadow:0 8px 35px rgba(30,43,33,.055)}
@@ -46,11 +47,11 @@
       <nav id="desktop-nav" class="nav-menu"></nav>
       <div class="sidebar-bottom">
         <div class="sidebar-quote"><span class="quote-star">✳</span><p>Good style starts with what you already own.</p></div>
-        <div class="privacy-note"><span class="privacy-dot"></span> Private · Saved in this browser</div>
+        <div class="privacy-note"><span class="privacy-dot"></span> Your wardrobe · Private by default</div>
       </div>
     </aside>
     <main class="main">
-      <div class="topline"><div id="breadcrumbs" class="breadcrumbs">YOUR PERSONAL WARDROBE</div><div class="top-actions"><span class="demo-flag">LOCAL WARDROBE · ONLINE SHOP</span><button class="icon-btn" id="help-btn" title="Getting started" aria-label="Getting started">?</button></div></div>
+      <div class="topline"><div id="breadcrumbs" class="breadcrumbs">YOUR PERSONAL WARDROBE</div><div class="top-actions"><span class="demo-flag">YOUR PERSONAL STYLE STUDIO</span><button class="icon-btn" id="help-btn" title="Getting started" aria-label="Getting started">?</button></div></div>
       <div id="view" aria-live="polite"></div>
     </main>
     <nav id="mobile-nav" class="mobile-nav" aria-label="Mobile navigation"></nav>
@@ -335,6 +336,7 @@ init();
 </script>
 <!-- Browser-safe project credentials only; do not add service-role keys. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+<script src="account-ui.js" defer></script>
 <script src="cloud-sync.js" defer></script>
 </body>
 </html>
