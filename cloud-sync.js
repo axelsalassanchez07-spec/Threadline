@@ -167,18 +167,24 @@
     } catch(e){guard.error=e.message||String(e);status('Cloud restore failed · local data unchanged where possible');}
     finally{guard.busy=false;guard.applying=false;showToolbar();}
   }
+  let clearingPrivateCache=null;
   async function clearPrivateCache(){
-    // Signed-out browsing must not reveal another account's locally cached wardrobe.
-    guard.applying=true;
-    try{
-      for(const store of stores)await hooks.originalReset(store);
-      await hooks.originalWrite('prefs',{...defaultPrefs,id:'user'});
-      shopState.swaps={};shopState.ownedProductIds=[];shopState.saved=[];shopState.ratings=[];
-      shopState.budget=250;shopState.inspirationId='';
-      hooks.originalShopStore();
-      localDelete(LINKED_KEY);localDelete(DIRTY_KEY);localDelete(LAST_SYNC_KEY);
-      await refresh();state.generated=[];render();
-    }finally{guard.applying=false;}
+    // Coalesce concurrent SIGNED_OUT events and menu actions into one cleanup.
+    // Signed-out browsing must never reveal an authenticated user's cached wardrobe.
+    if(clearingPrivateCache)return clearingPrivateCache;
+    clearingPrivateCache=(async()=>{
+      guard.applying=true;
+      try{
+        for(const store of stores)await hooks.originalReset(store);
+        await hooks.originalWrite('prefs',{...defaultPrefs,id:'user'});
+        shopState.swaps={};shopState.ownedProductIds=[];shopState.saved=[];shopState.ratings=[];
+        shopState.budget=250;shopState.inspirationId='';
+        hooks.originalShopStore();
+        localDelete(LINKED_KEY);localDelete(DIRTY_KEY);localDelete(LAST_SYNC_KEY);
+        await refresh();state.generated=[];render();
+      }finally{guard.applying=false;}
+    })();
+    try{await clearingPrivateCache;}finally{clearingPrivateCache=null;}
   }
   async function attachUser(user){
     clearTimeout(guard.timer);
