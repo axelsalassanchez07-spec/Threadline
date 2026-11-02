@@ -122,7 +122,7 @@ function selectCandidate(){
   // If nothing fits the limit, prioritize the cheapest alternatives rather than pretending we found a budget match.
   // After a large session, older *unrated* looks can be explored again.
   const window=candidates.slice(0,Math.min(under.length?22:4,candidates.length));
-  const pick=window[Math.floor(Math.pow(Math.random(),1.6)*window.length)];
+  const pick=under.length?window[Math.floor(Math.pow(Math.random(),1.6)*window.length)]:window[0];
   return {pick,withinBudget:under.length>0,cheapest,scanned};
 }
 shopGenerateInspired=function(){
