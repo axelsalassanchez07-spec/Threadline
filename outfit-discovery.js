@@ -118,10 +118,10 @@ function selectCandidate(){
   }
   const candidates=under.length?under:over;
   if(!candidates.length)return null;
-  candidates.sort((a,b)=>b.score-a.score||(a.price-b.price));
-  // Select among high-quality options instead of blindly choosing one formula.
+  candidates.sort(under.length?(a,b)=>b.score-a.score||(a.price-b.price):(a,b)=>a.price-b.price||b.score-a.score);
+  // If nothing fits the limit, prioritize the cheapest alternatives rather than pretending we found a budget match.
   // After a large session, older *unrated* looks can be explored again.
-  const window=candidates.slice(0,Math.min(22,candidates.length));
+  const window=candidates.slice(0,Math.min(under.length?22:4,candidates.length));
   const pick=window[Math.floor(Math.pow(Math.random(),1.6)*window.length)];
   return {pick,withinBudget:under.length>0,cheapest,scanned};
 }
