@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f7f6f2">
+<meta name="description" content="Sign in to THREADLINE or browse outfits without an account.">
+<title>V1.5 Test Sign in · THREADLINE</title><meta name="robots" content="noindex,nofollow">
+<link rel="stylesheet" href="./account.css">
+<style>
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#243229;background:#f7f6f2}
+body{min-height:100vh;display:grid;grid-template-columns:minmax(280px,1fr) minmax(380px,1fr)}
+.hero{background:#263b30;color:#eaf2e7;display:flex;flex-direction:column;padding:48px clamp(26px,5vw,80px);min-height:100vh;overflow:hidden;position:relative}
+.logo{display:flex;gap:12px;align-items:center;font-size:14px;font-weight:800;letter-spacing:.1em}
+.mark{display:grid;place-items:center;width:42px;height:42px;background:#f4f2e8;color:#23392c;border-radius:13px;font:bold 26px Georgia,serif}
+.hero-copy{margin:auto 0;max-width:520px;position:relative;z-index:1}
+.eyebrow{font-size:10px;letter-spacing:.25em;color:#b0c7af;font-weight:800}
+.hero h1{font:normal clamp(44px,5.5vw,78px)/1.02 Georgia,serif;letter-spacing:-.045em;margin:20px 0 22px}
+.hero h1 em{color:#b3c9ad;font-weight:normal}
+.hero p{font-size:15px;color:#d0dfd0;line-height:1.8;max-width:390px}
+.hero-art{position:absolute;opacity:.12;right:-90px;bottom:-80px;width:340px;height:340px;border:70px solid #fff;border-radius:50%}
+.bottom{font-size:11px;color:#b2c5b3}
+.panel{display:flex;flex-direction:column;padding:38px clamp(24px,5vw,74px);align-items:center;justify-content:center}
+.panel-inner{width:100%;max-width:425px}
+.back{display:inline-flex;align-items:center;gap:8px;text-decoration:none;font-size:12px;color:#536e56;margin:0 0 34px;font-weight:700}
+.panel h2{font:normal 38px/1.1 Georgia,serif;letter-spacing:-.04em;margin:0 0 12px}
+.description{font-size:13px;line-height:1.7;color:#768074;margin:0 0 28px}
+.provider{height:51px;width:100%;border:1px solid #dce1d9;border-radius:12px;background:#fffefa;color:#26352b;display:flex;justify-content:center;align-items:center;gap:12px;font-weight:700;font-size:13px;cursor:pointer;margin:0 0 10px}
+.provider:hover{border-color:#7c9a7e;background:#f2f6f0}
+.provider:disabled,.send:disabled{opacity:.5;cursor:wait}
+.provider .google{font-weight:900;color:#4285f4;font-size:19px;font-family:Arial,sans-serif}
+.provider .github{font-size:11px;border-radius:50%;background:#26352b;color:white;padding:6px}
+.divider{display:flex;gap:14px;align-items:center;margin:24px 0;color:#8a9589;font-size:11px}
+.divider:before,.divider:after{content:"";height:1px;flex:1;background:#e1e5dc}
+label{font-size:11px;font-weight:700;display:block;margin:0 0 8px}
+input{width:100%;height:47px;border:1px solid #dce1d9;border-radius:10px;background:#fffefa;padding:0 14px;font:inherit;font-size:13px;outline:0}
+input:focus{border-color:#6f9071;box-shadow:0 0 0 3px #dfeadd}
+.send{margin-top:10px;width:100%;height:47px;border-radius:10px;border:0;background:#293e30;color:white;font-size:13px;font-weight:750;cursor:pointer}
+.guest{display:block;padding:15px 10px;text-align:center;border:1px solid #dce1d9;border-radius:11px;text-decoration:none;color:#374e3c;background:#fffefa;font-size:13px;font-weight:750}
+.note{font-size:11px;line-height:1.65;color:#7a8578;margin-top:20px}
+.notice{font-size:12px;line-height:1.6;border-radius:10px;margin:14px 0 0;padding:12px 14px;background:#edf3eb;color:#36553c}
+.notice.error{background:#fff0eb;color:#993f29}
+#user-ready{display:none;text-align:center}
+#user-ready .symbol{font-size:40px;color:#688e70}
+@media(max-width:800px){body{display:block}.hero{min-height:unset;padding:20px 24px;background:#263b30}.hero-copy,.hero-art,.bottom{display:none}.panel{min-height:calc(100dvh - 83px);padding:36px 24px}.panel h2{font-size:34px}}
+</style>
+</head>
+<body>
+<aside class="hero"><div class="logo"><span class="mark">T.</span> THREADLINE</div><div class="hero-copy"><span class="eyebrow">YOUR PERSONAL STYLE STUDIO</span><h1>Your style.<br><em>All in one place.</em></h1><p>Build your digital wardrobe, save inspiration and discover thoughtful looks—on any device.</p></div><div class="hero-art" aria-hidden="true"></div><div class="bottom">DISCOVER · CREATE · WEAR</div></aside>
+<main class="panel"><div class="panel-inner">
+<a class="back" href="./">← Back to THREADLINE</a>
+<div id="sign-in-ui">
+<h2>Welcome to THREADLINE.</h2><p class="description">Sign in to sync your closet, outfits and preferences—or explore freely without an account.</p>
+<button class="provider" id="google" type="button"><span class="google">G</span> Continue with Google</button>
+<button class="provider" id="github" type="button"><span class="github">GH</span> Continue with GitHub</button>
+<div class="divider">or use your email</div>
+<form id="email-form"><label for="email">Email address</label><input id="email" type="email" autocomplete="email" placeholder="you@example.com" required maxlength="254"><button class="send" type="submit">Email me a sign-in link</button></form>
+<div class="divider">just looking?</div>
+<a class="guest" href="./?guest=1">Explore without signing in →</a>
+<p class="note">Guest activity stays in this browser. Sign in to keep your wardrobe and saved looks synced across devices. Email delivery depends on your project's Supabase email settings.</p>
+</div>
+<div id="user-ready"><div class="symbol">✓</div><h2>You're signed in.</h2><p class="description">Your account is connected. Your wardrobe will load when you return to THREADLINE.</p><a class="guest" href="./">Go to my wardrobe →</a><p class="note">To switch accounts, open your profile menu in THREADLINE and select Sign out. This safely removes your wardrobe cache from this browser.</p></div>
+<div id="notice" role="status" aria-live="polite"></div>
+</div></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+<script src="./auth.js" defer></script>
+</body></html>
