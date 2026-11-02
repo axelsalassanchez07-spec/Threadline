@@ -122,7 +122,7 @@ function selectCandidate(){
   // If nothing fits the limit, prioritize the cheapest alternatives rather than pretending we found a budget match.
   // After a large session, older *unrated* looks can be explored again.
   const window=candidates.slice(0,Math.min(under.length?22:4,candidates.length));
-  const pick=window[Math.floor(Math.pow(Math.random(),1.6)*window.length)];
+  const pick=under.length?window[Math.floor(Math.pow(Math.random(),1.6)*window.length)]:window[0];
   return {pick,withinBudget:under.length>0,cheapest,scanned};
 }
 shopGenerateInspired=function(){
@@ -202,6 +202,26 @@ renderShop=function(embedded=false){
 shopHandleClick=function(el){
   if(el.dataset.shopBudgetfit){
     shopGenerateInspired();render();return true;
+  }
+  if(el.dataset.shopSave){
+    const template=shopSeed();
+    const snapshot=shopState.selected==='discovery'?{...shopState.customLook,pieces:shopLineIds()}:null;
+    shopState.saved.push({
+      id:uid(),seed:shopState.selected,name:template.name,lines:shopLineIds(),
+      amount:shopAmount(),savedAt:Date.now(),customLook:snapshot
+    });
+    shopStore();render();toast('Exact outfit saved to your shopping looks.');
+    return true;
+  }
+  if(el.dataset.shopLoadsaved){
+    const saved=shopState.saved.find(r=>r.id===el.dataset.shopLoadsaved);
+    if(!saved)return true;
+    shopState.selected=saved.seed||'utility';
+    if(shopState.selected==='discovery'){
+      shopState.customLook=saved.customLook||{id:'discovery',name:saved.name||'Saved discovery',tagline:'Saved shopping outfit',formula:'A saved outfit from your earlier discoveries.',pieces:saved.lines.slice()};
+    }
+    shopState.swaps[shopState.selected]=saved.lines.slice();
+    shopState.swapSlot=-1;shopStore();render();return true;
   }
   return previousShopHandleClick(el);
 };
