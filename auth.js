@@ -31,12 +31,7 @@ $('email-form').addEventListener('submit',async e=>{
     notice('Check your inbox for a sign-in link. You can return to this tab after opening it.');
   }catch(e){notice('Email sign-in unavailable: '+(e.message||e),true);}finally{pendingState(false);}
 });
-$('sign-out').addEventListener('click',async()=>{
-  if(!confirm('Sign out of this device? Cloud data will remain stored in Supabase.'))return;
-  const {error}=await client.auth.signOut();
-  if(error){notice(error.message,true);return;}
-  $('user-ready').style.display='none';$('sign-in-ui').style.display='block';notice('Signed out.'); 
-});
+
 client.auth.getUser().then(({data,error})=>{
   if(error){notice('You can continue with a sign-in method below.');return;}
   if(data?.user){$('sign-in-ui').style.display='none';$('user-ready').style.display='block';}
