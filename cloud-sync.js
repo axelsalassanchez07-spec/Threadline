@@ -14,7 +14,9 @@
   const guard = { client:null, user:null, linked:false, busy:false, applying:false, error:'', status:'Cloud not connected', lastRemote:null, timer:null, job:Promise.resolve(), photoCache:new Map(), revision:0, allowReplaceOnce:false };
 
   const html = value => String(value ?? '').replace(/[&<>"']/g, ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-  const status = message => { guard.status = message; showToolbar(); };
+  // Account UI listens to this event; the cloud engine owns the single Supabase session.
+  window.ThreadlineCloud={getClient:()=>guard.client,getUser:()=>guard.user,getStatus:()=>guard.status};
+  const status = message => { guard.status = message; showToolbar(); window.dispatchEvent(new Event('threadline-cloud-updated')); };
   const localGet = k => {try{return localStorage.getItem(k)}catch{return null}};
   const localSet = (k,v) => {try{localStorage.setItem(k,v)}catch{}};
   const localDelete = k => {try{localStorage.removeItem(k)}catch{}};
@@ -188,7 +190,9 @@
   async function begin(){
     const root=document.createElement('section');
     root.id='threadline-cloud';root.setAttribute('aria-label','Private cloud synchronization');
-    document.querySelector('.topline')?.insertAdjacentElement('afterend',root);
+    const accountSlot=document.getElementById('tl-account-cloud-slot');
+    if(accountSlot){accountSlot.replaceChildren(root)}
+    else document.querySelector('.topline')?.insertAdjacentElement('afterend',root);
     if (!window.supabase?.createClient){showToolbar();return;}
     guard.client=window.supabase.createClient(PROJECT_URL,PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
     hooks=installWriteHooks();
@@ -201,8 +205,19 @@
           const {error}=await guard.client.auth.signInWithOAuth({provider:'github',options:{redirectTo:location.origin+location.pathname}});
           if(error)throw error;
         }else if(name==='logout'){
-          if(!confirm('Sign out? Your cloud backup remains saved; this browser may still have local data.'))return;
+          if(localGet(DIRTY_KEY)==='1'){guard.error='You have unsynced local changes. Sync and verify your cloud backup before signing out.';status('Sign-out paused to protect unsaved changes');return;}
+          if(!confirm('Sign out and clear synced wardrobe data from this browser? Your cloud backup will stay in Supabase.'))return;
           const {error}=await guard.client.auth.signOut();if(error)throw error;
+          guard.applying=true;
+          try{
+            for(const store of stores)await hooks.originalReset(store);
+            await hooks.originalWrite('prefs',{...defaultPrefs,id:'user'});
+            shopState.swaps={};shopState.ownedProductIds=[];shopState.saved=[];shopState.ratings=[];
+            shopState.budget=250;shopState.inspirationId='';
+            hooks.originalShopStore();
+            localDelete(LINKED_KEY);localDelete(DIRTY_KEY);localDelete(LAST_SYNC_KEY);
+            await refresh();state.generated=[];render();
+          }finally{guard.applying=false;}
           await attachUser(null);
         }else if(name==='download'){
           if(!confirm('Replace this browser’s THREADLINE wardrobe, inspiration, saved outfits and preferences with your cloud version? Export a local backup first if needed.'))return;
