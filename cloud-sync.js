@@ -167,12 +167,25 @@
     } catch(e){guard.error=e.message||String(e);status('Cloud restore failed · local data unchanged where possible');}
     finally{guard.busy=false;guard.applying=false;showToolbar();}
   }
+  async function clearPrivateCache(){
+    // Signed-out browsing must not reveal another account's locally cached wardrobe.
+    guard.applying=true;
+    try{
+      for(const store of stores)await hooks.originalReset(store);
+      await hooks.originalWrite('prefs',{...defaultPrefs,id:'user'});
+      shopState.swaps={};shopState.ownedProductIds=[];shopState.saved=[];shopState.ratings=[];
+      shopState.budget=250;shopState.inspirationId='';
+      hooks.originalShopStore();
+      localDelete(LINKED_KEY);localDelete(DIRTY_KEY);localDelete(LAST_SYNC_KEY);
+      await refresh();state.generated=[];render();
+    }finally{guard.applying=false;}
+  }
   async function attachUser(user){
     clearTimeout(guard.timer);
     guard.user=user;
     guard.error='';
     guard.linked=!!user&&localGet(LINKED_KEY)===user.id;
-    if (!user){status('Local mode — sign in to sync');return;}
+    if (!user){if(localGet(LINKED_KEY))await clearPrivateCache();status('Guest mode — browser-only saving');return;}
     status(guard.linked?'Checking your cloud data…':'Checking for a saved cloud wardrobe…');
     if(!guard.linked){
       try{
@@ -208,16 +221,7 @@
           if(localGet(DIRTY_KEY)==='1'){guard.error='You have unsynced local changes. Sync and verify your cloud backup before signing out.';status('Sign-out paused to protect unsaved changes');return;}
           if(!confirm('Sign out and clear synced wardrobe data from this browser? Your cloud backup will stay in Supabase.'))return;
           const {error}=await guard.client.auth.signOut();if(error)throw error;
-          guard.applying=true;
-          try{
-            for(const store of stores)await hooks.originalReset(store);
-            await hooks.originalWrite('prefs',{...defaultPrefs,id:'user'});
-            shopState.swaps={};shopState.ownedProductIds=[];shopState.saved=[];shopState.ratings=[];
-            shopState.budget=250;shopState.inspirationId='';
-            hooks.originalShopStore();
-            localDelete(LINKED_KEY);localDelete(DIRTY_KEY);localDelete(LAST_SYNC_KEY);
-            await refresh();state.generated=[];render();
-          }finally{guard.applying=false;}
+          await clearPrivateCache();
           await attachUser(null);
         }else if(name==='download'){
           if(!confirm('Replace this browser’s THREADLINE wardrobe, inspiration, saved outfits and preferences with your cloud version? Export a local backup first if needed.'))return;
