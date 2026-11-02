@@ -7,6 +7,7 @@
 const storeKey='threadline_v15_preview_shop_v11';
 const previousShopSeed=shopSeed;
 const previousRenderShop=renderShop;
+const previousRenderSaved=renderSaved;
 const previousShopHandleClick=shopHandleClick;
 
 try{
@@ -187,6 +188,7 @@ function archiveMarkup(){
        '<button class="btn btn-ghost btn-small" data-tl-archive-open="'+index+'">View again</button></div></div></article>';
    }).join('')+'</div>';
 }
+renderSaved=function(){return previousRenderSaved()+archiveMarkup();};
 renderShop=function(embedded=false){
   let view=previousRenderShop(embedded);
   const originalSelect='<select id="shop-look" class="select">';
@@ -238,7 +240,7 @@ document.addEventListener('click',e=>{
   shopState.selected='discovery';
   shopState.customLook={id:'discovery',name:row.name||'Archived outfit',tagline:'From your rated archive',formula:row.formula||'An outfit you previously rated.',pieces:row.items.slice()};
   shopState.swaps.discovery=row.items.slice();shopState.swapSlot=-1;
-  shopStore();render();
+  state.route='shop';shopStore();render();
   document.querySelector('.shop-look-meta')?.scrollIntoView({behavior:'smooth',block:'start'});
 });
 // Display the generator's new behavior immediately without touching the existing wardrobe.
