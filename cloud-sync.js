@@ -65,7 +65,7 @@
       saved:state.saved.map(x=>({...x})),
       feedback:state.feedback.map(x=>({...x})),
       prefs:{...state.prefs},
-      shoppingV11:{swaps:{...shopState.swaps},ownedProductIds:[...shopState.ownedProductIds],saved:[...shopState.saved],budget:shopState.budget,inspirationId:shopState.inspirationId,ratings:[...shopState.ratings]}
+      shoppingV11:{swaps:{...shopState.swaps},ownedProductIds:[...shopState.ownedProductIds],saved:[...shopState.saved],budget:shopState.budget,inspirationId:shopState.inspirationId,ratings:[...shopState.ratings],selected:shopState.selected,customLook:shopState.customLook||null,recent:[...(shopState.recent||[])],generation:shopState.generation||0}
     };
   }
   async function turnPhotoIntoPath(obj, group){
@@ -159,6 +159,11 @@
       shopState.saved=shop.saved||[];shopState.ratings=shop.ratings||[];
       shopState.budget=Number.isFinite(shop.budget)?shop.budget:250;
       shopState.inspirationId=shop.inspirationId||'';
+      shopState.selected=shop.selected||'utility';
+      shopState.customLook=shop.customLook||null;
+      if(shopState.selected==='discovery'&&!shopState.customLook)shopState.selected='utility';
+      shopState.recent=Array.isArray(shop.recent)?shop.recent:[];
+      shopState.generation=Number.isInteger(shop.generation)?shop.generation:0;
       hooks.originalShopStore();
       await refresh(); state.generated=[];
       guard.lastRemote=row.updated_at||null;
@@ -178,7 +183,8 @@
         for(const store of stores)await hooks.originalReset(store);
         await hooks.originalWrite('prefs',{...defaultPrefs,id:'user'});
         shopState.swaps={};shopState.ownedProductIds=[];shopState.saved=[];shopState.ratings=[];
-        shopState.budget=250;shopState.inspirationId='';
+        shopState.budget=250;shopState.inspirationId='';shopState.selected='utility';
+        shopState.customLook=null;shopState.recent=[];shopState.generation=0;
         hooks.originalShopStore();
         localDelete(LINKED_KEY);localDelete(DIRTY_KEY);localDelete(LAST_SYNC_KEY);
         await refresh();state.generated=[];render();
