@@ -27,7 +27,7 @@ function showDrafts(){
 async function showSaved(){
  const saved=await records('item:');
  el('saved-count').textContent=saved.length+' saved';
- el('saved-grid').innerHTML=saved.length?saved.map(x=>'<article class="review-item"><div class="review-top"><img class="thumb-mini" src="'+x.image+'" alt=""><div><strong>'+esc(x.name)+'</strong><p class="small">'+esc(x.category)+' · '+esc(x.kind)+' · '+esc(x.color)+'</p><div class="tagset">'+(x.tags||[]).map(t=>'<span class="pill">'+esc(t)+'</span>').join('')+'</div></div></div><button class="button-quiet" data-delete="'+esc(x.id)+'">Delete item</button></article>').join(''):'<div class="empty">No pieces saved to this lab yet.</div>';
+ el('saved-grid').innerHTML=saved.length?saved.map(x=>'<article class="review-item"><div class="review-top"><img class="thumb-mini" src="'+x.image+'" alt=""><div><strong>'+esc(x.name)+'</strong><p class="small">'+esc(x.category)+' · '+esc(x.kind)+' · '+esc(x.color)+'</p><div class="tagset">'+(x.tags||[]).map(t=>'<span class="pill">'+esc(t)+'</span>').join('')+'</div></div></div><button class="button-outline" data-edit="'+esc(x.id)+'">Review / edit</button><button class="button-quiet" data-delete="'+esc(x.id)+'">Delete item</button></article>').join(''):'<div class="empty">No pieces saved to this lab yet.</div>';
 }
 async function loadFiles(fileList){
  if(busy)return;
@@ -85,9 +85,12 @@ el('review-grid').addEventListener('click',e=>{
  if(single){const row=drafts.find(x=>x.id===single.dataset.saveOne);if(row)void persist([row]);}
 });
 el('saved-grid').addEventListener('click',async e=>{
+ const edit=e.target.closest('[data-edit]');
+ if(edit){const saved=(await records('item:')).find(x=>x.id===edit.dataset.edit);if(saved){drafts=drafts.filter(x=>x.id!==saved.id);drafts.unshift({...saved,estimatedColor:saved.estimatedColor||saved.color});showDrafts();el('review-grid').scrollIntoView({behavior:'smooth',block:'start'});feedback('Correct the saved item and save again. Its existing photo will remain.');}return;}
  const del=e.target.closest('[data-delete]');if(!del)return;
  if(!confirm('Delete this piece from the V1.6 lab?'))return;
  await erase(del.dataset.delete);await showSaved();feedback('Piece removed from the local test wardrobe.');
 });
 el('save-all').addEventListener('click',()=>void persist([...drafts]));
+el('review-existing')?.addEventListener('click',async()=>{const saved=await records('item:');drafts=[...saved.map(x=>({...x,estimatedColor:x.estimatedColor||x.color})),...drafts.filter(x=>!saved.some(y=>y.id===x.id))];showDrafts();el('review-grid').scrollIntoView({behavior:'smooth'});feedback('Review existing imported items in one grid. Save all to update their labels while keeping their photos.');});
 showDrafts();showSaved().catch(e=>feedback('Browser storage unavailable: '+e.message,true));
