@@ -1,6 +1,7 @@
 import {records,save,erase,themeCounts,esc,uid,el,feedback,initNav} from './shared.js';
 import {interpretStyleDescription} from './fashion-language.js';
 import {matchesForGarment,findSimilarUrl} from './retailer-refs.js';
+import {SLOT_LABELS,categoryConfirmed,validateOutfitPieces} from './outfit-rules.js';
 initNav('stylist');
 const DEMO=[
  ['top1','Tops','tee','white','Regular',['minimal','casual']],
@@ -59,14 +60,20 @@ function score(rows,direction,references,liked,skipped){
 }
 function candidates(){
  // Use actually uploaded clothing for a category whenever available; demo pieces only fill missing categories.
- const by=type=>{const owned=wardrobe.filter(x=>x.category===type);return owned.length?owned:DEMO.filter(x=>x.category===type)};
- const tops=by('Tops'),bottoms=by('Bottoms'),shoes=by('Shoes'),layers=[null,...by('Outerwear')],access=[null,...by('Accessories')];
+ const by=(type,max=12)=>{
+  const owned=wardrobe.filter(x=>x.category===type&&categoryConfirmed(x));
+  const base=owned.length?owned:(type==='Accessories'?[]:DEMO.filter(x=>x.category===type));
+  // Keep generation responsive for substantial wardrobes; rotate candidates each click.
+  return base.slice().sort(()=>Math.random()-.5).slice(0,max);
+ };
+ const tops=by('Tops'),bottoms=by('Bottoms'),shoes=by('Shoes'),
+       layers=[null,...by('Outerwear',8)],access=[null,...by('Accessories',8)];
  const pool=[];
  for(const t of tops)for(const b of bottoms)for(const shoe of shoes)for(const layer of layers){
   if(Math.random()>.65)continue;
   const extra=access[Math.floor(Math.random()*access.length)];
   const pieces=[t,b,shoe,...(layer?[layer]:[]),...(extra?[extra]:[])];
-  if(new Set(pieces.map(x=>x.id)).size!==pieces.length)continue;
+  if(!validateOutfitPieces(pieces).ok)continue;
   pool.push({id:'outfit:'+uid(),items:pieces,signature:sig(pieces),shape:silhouette(pieces)});
  }
  return pool;
@@ -93,7 +100,7 @@ function pieceView(x){
  const picture=x.image?'<img loading="lazy" src="'+esc(x.image)+'" alt="'+esc(x.name)+'">':
    reference?.image?'<img loading="lazy" src="'+esc(reference.image)+'" alt="Similar catalog example: '+esc(reference.name)+'">':
    '<div class="placeholder">'+esc(x.kind||'Unidentified item')+'</div>';
- return '<div class="piece">'+picture+
+ return '<div class="piece"><span class="piece-role">'+esc(SLOT_LABELS[x.category]||'ITEM')+'</span>'+picture+
    '<span>'+esc(x.name)+'<br>'+esc(x.color||'Unknown')+' · '+esc(x.fit||'Unknown')+'</span>'+
    (reference&&!x.image?'<span class="retailer-note">Example product photo, not this exact item</span>':'')+'</div>';
 }
@@ -113,7 +120,7 @@ function shoppingReferences(o){
  ).join(' · ');
  const lookQuery=o.items.map(x=>x.kind).filter(Boolean).join(' ')+' outfit styling references';
  const photoSearch='https://www.google.com/search?tbm=isch&q='+encodeURIComponent(lookQuery);
- return '<div class="retailer-section"><strong>See styling references and find similar pieces</strong>'+
+ return '<div class="retailer-section"><strong>Shopping alternatives — not additional pieces in this outfit</strong>'+
    '<p class="small">Retailer examples below come from the original limited catalog; these are not live listings and might not exactly match the generated garments.</p>'+
    (shopping?'<div class="retailer-grid">'+shopping+'</div>':'<p class="small">No sufficiently similar image exists in the starter catalog for these garments.</p>')+
    '<div class="shopping-search"><a href="'+esc(photoSearch)+'" target="_blank" rel="noopener noreferrer">See full-outfit photo ideas ↗</a> · '+similar+'</div></div>';
@@ -128,6 +135,7 @@ function inspirationPreview(){
 }
 function card(o){
  return '<article class="outfit"><span class="eyebrow">'+esc(o.direction||'Archived')+' · '+(o.items.some(x=>x.demo)?'includes demonstration pieces':'from your wardrobe')+'</span>'+
+ '<p class="small"><strong>One top + one bottom + one pair of shoes.</strong> Jacket and accessory are optional. These are outfit pieces, not alternatives.</p>'+
  '<h3>'+esc(o.items.find(x=>x.category==='Outerwear')?.kind||o.items[0]?.kind||'Outfit')+' + '+esc(o.items.find(x=>x.category==='Bottoms')?.kind||'bottoms')+'</h3>'+
  inspirationPreview()+
  '<div class="outfit-pieces">'+o.items.map(pieceView).join('')+'</div><p>'+esc(o.notes||'This outfit was generated from saved clothing and styling cues.')+'</p>'+
@@ -136,7 +144,10 @@ function card(o){
 }
 function render(){
  el('looks').innerHTML=current.length?current.map(card).join(''):'<div class="empty">Generate your first three directions.</div>';
- el('look-status').textContent='Using '+wardrobe.length+' lab wardrobe pieces, '+inspirations.length+' inspiration references, and '+ratings.length+' previous ratings.';
+ const verified=wardrobe.filter(categoryConfirmed).length,needsReview=wardrobe.length-verified;
+ el('look-status').textContent='Using '+verified+' category-confirmed wardrobe pieces, '+inspirations.length+' inspiration references and '+ratings.length+' ratings.'+(needsReview?' '+needsReview+' earlier uploads are excluded until you review their categories.':'');
+ const reminder=el('category-reminder');
+ if(reminder){reminder.hidden=needsReview===0;reminder.textContent=needsReview+' wardrobe item(s) still need their category reviewed before they can enter generated outfits. No extra pants or shoes are intended as alternatives in the outfit row.';}
  el('creativity-name').textContent=creativity;
  const counts=themeCounts(inspirations);
  el('signals').innerHTML=counts.length?counts.slice(0,7).map(x=>'<span class="pill">'+esc(x.label)+' · '+x.count+'</span>').join(''):'<span class="small">Add references in Inspiration Intelligence to personalize these suggestions.</span>';
