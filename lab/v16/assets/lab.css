@@ -16,3 +16,11 @@
 .shopping-search{font-size:11px;line-height:1.8}
 .shopping-search a{color:#426a48;text-underline-offset:2px}
 @media(max-width:600px){.retailer-grid{grid-template-columns:1fr}.retailer-example img{height:50px}.inspo-reference-images img{width:60px;height:78px}}
+
+/* Optional device camera. Keep hidden until explicit user permission. */
+[hidden]{display:none!important}
+.camera-stage{border:1px solid #d5e0d1;background:#1b2820;border-radius:15px;padding:12px;margin-bottom:14px}
+.camera-stage video{display:block;max-width:100%;width:100%;max-height:340px;object-fit:contain;border-radius:10px;background:#15231a}
+.camera-stage .button-outline{background:#f6f7f3}
+.piece-role{display:block;font-size:9px;letter-spacing:.1em;color:#45684c;font-weight:900;margin-bottom:6px;background:#e7efe4;padding:4px 7px;border-radius:7px}
+.outfit .piece{padding:3px;border:1px solid #e9ede6;border-radius:10px;min-width:0}
