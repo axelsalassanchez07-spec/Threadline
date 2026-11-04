@@ -25,7 +25,7 @@ async function paintPatterns(){
     '<div class="signal"><span>'+esc(x.label)+'</span><span class="small">'+x.count+' of '+data.length+'</span></div><div class="bar" style="margin:-3px 0 13px"><div style="width:'+Math.round(x.count/data.length*100)+'%"></div></div>'
   ).join(''):'<div class="empty">Your recurring inspiration signals will appear here after you tag a few looks.</div>';
  el('saved-grid').innerHTML=data.length?data.map(row=>
-  '<article class="review-item"><div class="review-top"><img class="thumb-mini" src="'+row.image+'" alt=""><div><strong>'+esc(row.name)+'</strong><p class="small">'+esc(row.notes||'No notes yet')+'</p></div></div><div class="tagset">'+(row.tags||[]).map(t=>'<span class="pill">'+esc(t)+'</span>').join('')+'</div><div class="row between" style="margin-top:12px"><a class="button-outline" href="../stylist/?inspo='+encodeURIComponent(row.id)+'">Develop this look →</a><button class="button-quiet" data-delete="'+row.id+'">Delete</button></div></article>'
+  '<article class="review-item"><div class="review-top"><img class="thumb-mini" src="'+row.image+'" alt=""><div><strong>'+esc(row.name)+'</strong><p class="small">'+esc(row.notes||'No notes yet')+'</p></div></div><div class="tagset">'+(row.tags||[]).map(t=>'<span class="pill">'+esc(t)+'</span>').join('')+'</div><div class="row between" style="margin-top:12px"><a class="button-outline" href="../stylist/?inspo='+encodeURIComponent(row.id)+'">Develop this look →</a><button class="button-outline" data-edit="'+row.id+'">Edit notes</button><button class="button-quiet" data-delete="'+row.id+'">Delete</button></div></article>'
  ).join(''):'<div class="empty">Your saved references will appear here.</div>';
 }
 async function load(files){
@@ -66,6 +66,8 @@ el('review-grid').addEventListener('click',e=>{
  if(e.target.closest('[data-save-one]'))void persist([row]);
 });
 el('saved-grid').addEventListener('click',async e=>{
+ const edit=e.target.closest('[data-edit]');
+ if(edit){const row=(await records('inspo:')).find(x=>x.id===edit.dataset.edit);if(row){drafts=drafts.filter(x=>x.id!==row.id);drafts.unshift({...row});showDrafts();el('review-grid').scrollIntoView({behavior:'smooth',block:'start'});feedback('Edit the description and suggested cues, then save the same inspiration again.');}return;}
  const key=e.target.closest('[data-delete]')?.dataset.delete;
  if(!key)return;
  if(!confirm('Remove this inspiration from the V1.6 test board?'))return;
