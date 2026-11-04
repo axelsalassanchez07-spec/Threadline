@@ -21,7 +21,7 @@ const DEMO=[
  ['layer4','Outerwear','track jacket','red','Relaxed',['sporty','retro']],
  ['accessory1','Accessories','cap','white','Regular',['sporty','streetwear']]
 ].map(([id,category,kind,color,fit,tags])=>({id:'demo:'+id,category,kind,color,fit,tags,name:'Demo · '+kind[0].toUpperCase()+kind.slice(1),demo:true}));
-let wardrobe=[],inspirations=[],ratings=[],current=[],recent=[],refId='',creativity='Balanced';
+let wardrobe=[],inspirations=[],ratings=[],current=[],recent=[],refId='',creativity='Balanced',promptText='';
 const sig=rows=>rows.map(x=>x.id).slice().sort().join('|');
 const silhouette=rows=>[rows.find(x=>x.category==='Tops')?.fit,rows.find(x=>x.category==='Bottoms')?.kind,rows.find(x=>x.category==='Outerwear')?.kind,rows.find(x=>x.category==='Shoes')?.kind].filter(Boolean).join('|');
 function rowTags(r){
@@ -29,10 +29,10 @@ function rowTags(r){
 }
 function desired(){
  const selected=inspirations.find(x=>x.id===refId);
- if(selected)return [...new Set([...(selected.tags||[]),...interpretStyleDescription(selected.notes||'').tags])];
+ if(selected)return [...new Set([...(selected.tags||[]),...interpretStyleDescription(selected.notes||'').tags,...interpretStyleDescription(promptText).tags])];
  const learned=inspirations.flatMap(x=>[...(x.tags||[]),...interpretStyleDescription(x.notes||'').tags]);
  const counts=new Map();learned.forEach(t=>counts.set(t,(counts.get(t)||0)+1));
- return [...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,7).map(x=>x[0]);
+ return [...new Set([...interpretStyleDescription(promptText).tags,...[...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,7).map(x=>x[0])])];
 }
 function score(rows,direction,references,liked,skipped){
  const tags=rows.flatMap(x=>[...rowTags(x)]);
@@ -166,7 +166,13 @@ async function generate(){
  }
  render();
 }
-el('generate').addEventListener('click',()=>void generate());
+el('generate').addEventListener('click',()=>{promptText=el('style-prompt')?.value?.trim()||'';void generate();});
+el('interpret-prompt')?.addEventListener('click',()=>{
+ promptText=el('style-prompt')?.value?.trim()||'';
+ const result=interpretStyleDescription(promptText);
+ el('prompt-terms').textContent=result.summary;
+ void generate();
+});
 el('reference').addEventListener('change',e=>{refId=e.target.value;void generate();});
 document.querySelectorAll('[data-creativity]').forEach(b=>b.addEventListener('click',()=>{
  creativity=b.dataset.creativity;
