@@ -1,4 +1,5 @@
 import {records,save,erase,photo,guessFilename,CATEGORIES,COLORS,FITS,TYPES,esc,uid,el,feedback,options,initNav} from './shared.js';
+import {classifyGarment} from './vision-client.js';
 initNav('wardrobe');
 let drafts=[];
 let busy=false;
@@ -17,7 +18,7 @@ function draftCard(item){
    field('Color',select('color',['Unknown',...COLORS]))+
    field('Fit',select('fit',FITS))+
    field('Style notes (optional)','<input data-field="tags" value="'+esc((item.tags||[]).join(', '))+'" placeholder="e.g. casual, cropped, layered">')+
-   '</div><div class="row between" style="margin-top:12px"><span class="small">Check category and type before saving</span><div class="row"><button class="button-quiet" data-discard="'+item.id+'">Remove</button><button class="button-outline" data-save-one="'+item.id+'">Save item</button></div></div></article>';
+   '</div><div class="row between" style="margin-top:12px"><span class="small">Check category and type before saving</span><div class="row"><button type="button" class="button-outline" data-ai="'+esc(item.id)+'">✨ Analyze with AI</button><button class="button-quiet" data-discard="'+item.id+'">Remove</button><button class="button-outline" data-save-one="'+item.id+'">Save item</button></div></div></article>';
 }
 function showDrafts(){
  el('draft-heading').textContent=drafts.length?'Review '+drafts.length+' clothing draft'+(drafts.length===1?'':'s'):'Upload clothing photos';
@@ -82,6 +83,25 @@ el('review-grid').addEventListener('change',e=>{
  }
 });
 el('review-grid').addEventListener('click',e=>{
+ const ai=e.target.closest('[data-ai]');
+ if(ai){
+  const item=drafts.find(x=>x.id===ai.dataset.ai);if(!item)return;
+  if(!confirm('Send this clothing photo to an AI vision provider through the authenticated Supabase function? The classification will only become a draft for your review.'))return;
+  ai.disabled=true;ai.textContent='Analyzing…';
+  void classifyGarment(item.image).then(result=>{
+   const category=CATEGORIES.includes(result.category)?result.category:'';
+   item.category=category&&TYPES[category]?.includes(result.kind)?category:'';
+   item.kind=item.category?result.kind:'';
+   item.name=String(result.name||item.name).slice(0,70);
+   item.color=COLORS.includes(result.color)?result.color:'Unknown';
+   item.fit=FITS.includes(result.fit)?result.fit:'Unknown';
+   item.tags=Array.isArray(result.tags)?result.tags.map(x=>String(x).toLowerCase()).slice(0,4):[];
+   item.uncertain=result.confidence!=='high';
+   item.visionNote=String(result.note||'Please check this suggestion.').slice(0,300);
+   showDrafts();feedback('AI provided a '+result.confidence+'-confidence suggestion: '+item.visionNote+' Review every field before saving.');
+  }).catch(err=>{ai.disabled=false;ai.textContent='✨ Analyze with AI';feedback('AI classification unavailable: '+(err.message||err),true);});
+  return;
+ }
  const del=e.target.closest('[data-discard]'),single=e.target.closest('[data-save-one]');
  if(del){drafts=drafts.filter(x=>x.id!==del.dataset.discard);showDrafts();}
  if(single){const row=drafts.find(x=>x.id===single.dataset.saveOne);if(row)void persist([row]);}
