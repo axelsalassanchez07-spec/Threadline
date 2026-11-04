@@ -34,6 +34,7 @@ export async function records(prefix=''){
 }
 export async function save(row){const database=await db();return new Promise((res,rej)=>{const tx=database.transaction('records','readwrite');tx.objectStore('records').put(row);tx.oncomplete=res;tx.onerror=()=>rej(tx.error);});}
 export async function erase(id){const database=await db();return new Promise((res,rej)=>{const tx=database.transaction('records','readwrite');tx.objectStore('records').delete(id);tx.oncomplete=res;tx.onerror=()=>rej(tx.error);});}
+export async function clearLab(){const database=await db();return new Promise((res,rej)=>{const tx=database.transaction('records','readwrite');tx.objectStore('records').clear();tx.oncomplete=res;tx.onerror=()=>rej(tx.error);});}
 export function feedback(text,bad=false){const box=el('status');if(!box)return;box.textContent=text;box.className='status '+(bad?'bad':'good');}
 export function photo(file,maxSize=700){
  return new Promise((res,rej)=>{
