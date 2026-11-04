@@ -18,7 +18,7 @@ function draftCard(item){
    field('Color',select('color',['Unknown',...COLORS]))+
    field('Fit',select('fit',FITS))+
    field('Style notes (optional)','<input data-field="tags" value="'+esc((item.tags||[]).join(', '))+'" placeholder="e.g. casual, cropped, layered">')+
-   '</div><div class="row between" style="margin-top:12px"><span class="small">Check category and type before saving</span><div class="row"><button type="button" class="button-outline" data-ai="'+esc(item.id)+'">✨ Analyze with AI</button><button class="button-quiet" data-discard="'+item.id+'">Remove</button><button class="button-outline" data-save-one="'+item.id+'">Save item</button></div></div></article>';
+   '</div><label class="row" style="margin:10px 0;font-size:12px;font-weight:650"><input type="checkbox" data-confirm="1" '+((item.categoryConfirmedByUser||item.verifiedCategory===true)?'checked':'')+' style="width:16px;height:16px;accent-color:#395b40"> I checked this category and type against the photo</label><div class="row between" style="margin-top:12px"><span class="small">Verify before saving</span><div class="row"><button type="button" class="button-outline" data-ai="'+esc(item.id)+'">✨ Analyze with AI</button><button class="button-quiet" data-discard="'+item.id+'">Remove</button><button class="button-outline" data-save-one="'+item.id+'">Save item</button></div></div></article>';
 }
 function showDrafts(){
  el('draft-heading').textContent=drafts.length?'Review '+drafts.length+' clothing draft'+(drafts.length===1?'':'s'):'Upload clothing photos';
@@ -58,12 +58,12 @@ async function loadFiles(fileList){
 }
 async function persist(items){
  if(!items.length)return;
- const invalid=items.filter(x=>!x.category||!TYPES[x.category]?.includes(x.kind)||!String(x.name||'').trim());
- if(invalid.length){feedback(invalid.length+' draft(s) still need a category, type or name. Nothing was saved, to avoid incorrect outfit suggestions.',true);return;}
+ const invalid=items.filter(x=>!x.category||!TYPES[x.category]?.includes(x.kind)||!String(x.name||'').trim()||!(x.categoryConfirmedByUser||x.verifiedCategory===true));
+ if(invalid.length){feedback(invalid.length+' draft(s) need a category, type, name, and a checked confirmation that the photo matches the labels. Nothing was saved.',true);return;}
  for(const x of items){if(/^Unidentified item/i.test(x.name))x.name=[x.color!=='Unknown'?x.color:'',x.kind].filter(Boolean).join(' ').replace(/\\b\\w/g,c=>c.toUpperCase());}
  el('save-all').disabled=true;
  let count=0;
- for(const row of items){try{await save({...row,reviewed:true,verifiedCategory:true,verifiedAt:Date.now()});count++;drafts=drafts.filter(x=>x.id!==row.id);}catch(e){feedback('Could not save all images: '+e.message,true);break;}}
+ for(const row of items){try{await save({...row,reviewed:true,verifiedCategory:true,categoryConfirmedByUser:true,verifiedAt:Date.now()});count++;drafts=drafts.filter(x=>x.id!==row.id);}catch(e){feedback('Could not save all images: '+e.message,true);break;}}
  showDrafts();await showSaved();feedback(count+' clothing piece'+(count===1?'':'s')+' saved to the isolated lab on this browser.');
 }
 el('file-input').addEventListener('change',e=>void loadFiles(e.target.files));
@@ -77,6 +77,7 @@ el('review-grid').addEventListener('input',e=>{
 el('review-grid').addEventListener('change',e=>{
  const row=e.target.closest('[data-draft]'),item=drafts.find(x=>x.id===row?.dataset.draft);
  if(!item)return;
+ if(e.target.dataset.confirm){item.categoryConfirmedByUser=e.target.checked;return;}
  if(e.target.dataset.field==='category'){
    item.category=e.target.value;item.kind=item.category?(TYPES[item.category]?.[0]||''):'';
    row.querySelector('[data-field="kind"]').innerHTML='<option value="">Choose type</option>'+options(TYPES[item.category]||[],item.kind);
