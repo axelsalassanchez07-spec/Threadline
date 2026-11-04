@@ -60,26 +60,33 @@ const palette={black:[40,42,43],white:[235,234,231],cream:[220,208,182],gray:[14
 function nearestColor(rgb){return Object.keys(palette).sort((a,b)=>distance(rgb,palette[a])-distance(rgb,palette[b]))[0];}
 function distance(a,b){return a.reduce((sum,n,i)=>sum+(n-b[i])**2,0);}
 export function guessFilename(name){
- const n=String(name||'').toLowerCase().replace(/[_-]/g,' ');
+ // Never guess clothing type or a readable name from an opaque camera filename.
+ // These are FILE-NAME hints, not computer-vision predictions.
+ const input=String(name||'').replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').trim();
+ const n=input.toLowerCase();
  const rules=[
-  [/cap|hat|beanie|scarf|belt|watch|bag|backpack/, 'Accessories','cap'],
-  [/sneaker|trainer|shoe|boot|loafer|sandal/, 'Shoes','sneakers'],
-  [/jacket|blazer|coat|bomber|cardigan|overshirt/, 'Outerwear','other layer'],
-  [/jean|pants|trouser|cargo|chino|short|skirt|denim bottom/, 'Bottoms','jeans'],
-  [/hoodie|shirt|tee|top|polo|sweater|rugby|jersey/, 'Tops','tee']
+  {re:/\b(baseball cap|cap|beanie|hat|scarf|belt|watch|bag|backpack)\b/,category:'Accessories',kind:'cap'},
+  {re:/\b(sneakers?|trainers?|shoes?|boots?|loafers?|sandals?|heels?)\b/,category:'Shoes',kind:'sneakers'},
+  {re:/\b(jacket|blazer|coat|bomber|cardigan|overshirt|parka)\b/,category:'Outerwear',kind:'other layer'},
+  {re:/\b(jeans?|pants?|trousers?|cargo|chinos?|shorts?|skirt|leggings)\b/,category:'Bottoms',kind:'other bottoms'},
+  {re:/\b(hoodie|shirt|tee|tshirt|t-shirt|polo|sweater|rugby|jersey|blouse|top)\b/,category:'Tops',kind:'other top'}
  ];
- const found=rules.find(r=>r[0].test(n));
- let category=found?.[1]||'Tops',kind=found?.[2]||'other top';
- const match=TYPES[category].find(t=>n.includes(t));
- if(match)kind=match;
- if(n.includes('cap'))kind='cap';
- if(n.includes('hoodie'))kind='hoodie';
- if(n.includes('bomber'))kind='bomber jacket';
- if(n.includes('boot'))kind='boots';
- if(n.includes('loafer'))kind='loafers';
- const color=COLORS.find(c=>new RegExp('\\b'+c+'\\b').test(n));
- const words=n.replace(/\.(jpe?g|png|webp|heic)$/,'').replace(/\b(img|image|photo|dsc|whatsapp|screenshot|camera|copy)\b/g,'').replace(/[0-9]+/g,'').trim();
- return {name:words.length>3?words.split(' ').filter(Boolean).map(w=>w[0].toUpperCase()+w.slice(1)).join(' '):'Untitled garment',category,kind,color,fit:'Unknown',tags:[],uncertain:!found};
+ const found=rules.find(r=>r.re.test(n));
+ const category=found?.category||'';
+ let kind=found?.kind||'';
+ if(category){
+  kind=TYPES[category].find(type=>n.includes(type))||kind;
+  if(/\bjeans?\b/.test(n))kind='jeans';
+  if(/\bboots?\b/.test(n))kind='boots';
+  if(/\bloafers?\b/.test(n))kind='loafers';
+  if(/\bcaps?\b/.test(n))kind='cap';
+  if(/\bhoodie\b/.test(n))kind='hoodie';
+  if(/\bbomber\b/.test(n))kind='bomber jacket';
+  if(/\bwide[- ]leg\b/.test(n)&&category==='Bottoms')kind='wide-leg trousers';
+ }
+ const color=COLORS.find(c=>new RegExp('\\b'+c+'\\b').test(n))||'Unknown';
+ const title=kind?[(color==='Unknown'?'':color),kind].filter(Boolean).join(' ').replace(/\b\w/g,c=>c.toUpperCase()):'Unidentified clothing item';
+ return {name:title,category,kind,color,fit:'Unknown',tags:[],uncertain:!found,source:'filename-hint'};
 }
 export function themeCounts(inspirations){
  const counts=new Map();
