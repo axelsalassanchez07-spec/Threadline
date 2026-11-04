@@ -81,17 +81,17 @@ function candidates(){
 function chooseLooks(){
  const pool=candidates(),references=desired();
  const liked=ratings.filter(x=>x.value==='love'),skipped=ratings.filter(x=>x.value==='skip');
- let used=new Set(ratings.map(x=>x.signature)),out=[],shapes=new Set();
+ let used=new Set(ratings.map(x=>x.signature)),out=[],shapes=new Set(),previousCore=new Set();
  for(const dir of ['Recreate','Reinterpret','Explore']){
   const candidates=pool.filter(x=>!used.has(x.signature))
-    .map(x=>({...x,points:score(x.items,dir,references,liked,skipped)-(shapes.has(x.shape)?22:0)}))
+    .map(x=>({...x,points:score(x.items,dir,references,liked,skipped)-(shapes.has(x.shape)?22:0)-x.items.filter(item=>['Bottoms','Shoes'].includes(item.category)&&previousCore.has(item.id)).length*19}))
     .sort((a,b)=>b.points-a.points);
   if(!candidates.length)break;
   const pick=candidates[Math.floor(Math.random()*Math.min(9,candidates.length))];
   pick.direction=dir;
   pick.notes=(dir==='Recreate'?'Closely reflects your current inspiration cues.':dir==='Reinterpret'?'Keeps some familiar styling details while changing the formula.':'Pushes toward a different silhouette, layering or garment mix.')+
     (references.length?' Signals: '+references.slice(0,4).join(', ')+'.':' Add inspiration references for more relevant guidance.');
-  out.push(pick);used.add(pick.signature);shapes.add(pick.shape);
+  out.push(pick);used.add(pick.signature);shapes.add(pick.shape);for(const item of pick.items)if(['Bottoms','Shoes'].includes(item.category))previousCore.add(item.id);
  }
  return out;
 }
