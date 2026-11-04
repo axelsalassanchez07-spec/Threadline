@@ -26,8 +26,10 @@ function showDrafts(){
 }
 async function showSaved(){
  const saved=await records('item:');
- el('saved-count').textContent=saved.length+' saved';
- el('saved-grid').innerHTML=saved.length?saved.map(x=>'<article class="review-item"><div class="review-top"><img class="thumb-mini" src="'+x.image+'" alt=""><div><strong>'+esc(x.name)+'</strong><p class="small">'+esc(x.category)+' · '+esc(x.kind)+' · '+esc(x.color)+'</p><div class="tagset">'+(x.tags||[]).map(t=>'<span class="pill">'+esc(t)+'</span>').join('')+'</div></div></div><button class="button-outline" data-edit="'+esc(x.id)+'">Review / edit</button><button class="button-quiet" data-delete="'+esc(x.id)+'">Delete item</button></article>').join(''):'<div class="empty">No pieces saved to this lab yet.</div>';
+ const pending=saved.filter(x=>x.verifiedCategory!==true).length;
+ el('saved-count').textContent=saved.length+' saved'+(pending?' · '+pending+' need review':'');
+ const help=el('review-guidance');if(help)help.textContent=pending?pending+' earlier imported items need a confirmed category before the Stylist uses them. Choose Review all saved items, correct labels and Save all.':'All saved items have confirmed categories for the Stylist.';
+ el('saved-grid').innerHTML=saved.length?saved.map(x=>'<article class="review-item"><div class="review-top"><img class="thumb-mini" src="'+x.image+'" alt=""><div><strong>'+esc(x.name)+'</strong><p class="small">'+esc(x.category||'Unconfirmed')+' · '+esc(x.kind||'Unconfirmed')+' · '+esc(x.color)+'</p>'+(x.verifiedCategory===true?'<span class="pill">Category confirmed</span>':'<span class="pill">Needs review — excluded from outfits</span>')+'<div class="tagset">'+(x.tags||[]).map(t=>'<span class="pill">'+esc(t)+'</span>').join('')+'</div></div></div><button class="button-outline" data-edit="'+esc(x.id)+'">Review / edit</button><button class="button-quiet" data-delete="'+esc(x.id)+'">Delete item</button></article>').join(''):'<div class="empty">No pieces saved to this lab yet.</div>';
 }
 async function loadFiles(fileList){
  if(busy)return;
@@ -60,7 +62,7 @@ async function persist(items){
  for(const x of items){if(/^Unidentified item/i.test(x.name))x.name=[x.color!=='Unknown'?x.color:'',x.kind].filter(Boolean).join(' ').replace(/\\b\\w/g,c=>c.toUpperCase());}
  el('save-all').disabled=true;
  let count=0;
- for(const row of items){try{await save({...row,reviewed:true});count++;drafts=drafts.filter(x=>x.id!==row.id);}catch(e){feedback('Could not save all images: '+e.message,true);break;}}
+ for(const row of items){try{await save({...row,reviewed:true,verifiedCategory:true,verifiedAt:Date.now()});count++;drafts=drafts.filter(x=>x.id!==row.id);}catch(e){feedback('Could not save all images: '+e.message,true);break;}}
  showDrafts();await showSaved();feedback(count+' clothing piece'+(count===1?'':'s')+' saved to the isolated lab on this browser.');
 }
 el('file-input').addEventListener('change',e=>void loadFiles(e.target.files));
@@ -93,4 +95,42 @@ el('saved-grid').addEventListener('click',async e=>{
 });
 el('save-all').addEventListener('click',()=>void persist([...drafts]));
 el('review-existing')?.addEventListener('click',async()=>{const saved=await records('item:');drafts=[...saved.map(x=>({...x,estimatedColor:x.estimatedColor||x.color})),...drafts.filter(x=>!saved.some(y=>y.id===x.id))];showDrafts();el('review-grid').scrollIntoView({behavior:'smooth'});feedback('Review existing imported items in one grid. Save all to update their labels while keeping their photos.');});
+
+/* Camera works with user permission only. Capture JPEG still images, never record video. */
+let activeStream=null;
+const cameraBox=el('camera-box'),liveVideo=el('camera-video');
+function stopCamera(){
+ if(activeStream){activeStream.getTracks().forEach(track=>track.stop());activeStream=null;}
+ if(liveVideo)liveVideo.srcObject=null;
+ if(cameraBox)cameraBox.hidden=true;
+}
+el('camera-phone')?.addEventListener('change',e=>{void loadFiles(e.target.files);e.target.value='';});
+el('camera-start')?.addEventListener('click',async()=>{
+ if(!navigator.mediaDevices?.getUserMedia){feedback('Camera capture is unavailable here. Use the phone camera button or select existing photos.',true);return;}
+ if(activeStream)return;
+ const btn=el('camera-start');btn.disabled=true;
+ try{
+  activeStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+  liveVideo.srcObject=activeStream;cameraBox.hidden=false;
+  await liveVideo.play();
+  feedback('Camera ready. Capture one garment at a time; you can capture multiple items before stopping.');
+ }catch(e){stopCamera();feedback('Camera unavailable or permission denied: '+(e.message||e)+'. Select existing photos instead.',true);}
+ finally{btn.disabled=false;}
+});
+el('camera-stop')?.addEventListener('click',()=>{stopCamera();feedback('Camera stopped. No video was recorded or uploaded.');});
+el('camera-snap')?.addEventListener('click',async()=>{
+ if(!activeStream||!liveVideo.videoWidth)return feedback('Camera is not ready yet.',true);
+ const canvas=document.createElement('canvas'),ratio=Math.min(1,1050/Math.max(liveVideo.videoWidth,liveVideo.videoHeight));
+ canvas.width=Math.max(1,Math.round(liveVideo.videoWidth*ratio));
+ canvas.height=Math.max(1,Math.round(liveVideo.videoHeight*ratio));
+ canvas.getContext('2d').drawImage(liveVideo,0,0,canvas.width,canvas.height);
+ const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.83));
+ if(!blob)return feedback('Photo capture failed.',true);
+ const stamp=Date.now(),file=new File([blob],'camera-'+stamp+'.jpg',{type:'image/jpeg',lastModified:stamp});
+ await loadFiles([file]);
+ feedback('Captured one garment. Confirm its category in the drafts below, or scan another.');
+});
+window.addEventListener('pagehide',stopCamera);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stopCamera();});
+
 showDrafts();showSaved().catch(e=>feedback('Browser storage unavailable: '+e.message,true));
