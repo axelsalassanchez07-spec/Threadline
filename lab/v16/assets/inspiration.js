@@ -1,4 +1,5 @@
 import {records,save,erase,photo,THEMES,esc,uid,el,feedback,themeCounts,initNav} from './shared.js';
+import {interpretStyleDescription} from './fashion-language.js';
 initNav('inspiration');
 let drafts=[],busy=false;
 function themeButtons(row){
@@ -7,7 +8,7 @@ function themeButtons(row){
 function draftCard(row){
  return '<article class="review-item" data-draft="'+esc(row.id)+'"><div class="review-top"><img class="thumb" src="'+row.image+'" alt="Saved inspiration preview"><div style="flex:1"><div class="field"><label>Reference name</label><input data-field="name" value="'+esc(row.name)+'" maxlength="70"></div><p class="small">Estimated image palette: '+esc(row.estimatedColor)+' (may reflect the background)</p></div></div>'+
  '<div class="field"><label>What attracted you to this look?</label><textarea data-field="notes" placeholder="Optional, but helpful: what silhouette, garment or styling idea do you like?">'+esc(row.notes||'')+'</textarea></div>'+
- '<p class="small">Select the style characteristics you notice (these are not auto-recognized yet):</p>'+themeButtons(row)+
+ '<div class="row between" style="margin:10px 0"><button type="button" class="button-outline" data-translate="1">Translate my description into fashion terms</button></div>'+ '<div class="summary" data-interpreted="1">'+esc(row.interpretation||'Write what you like in everyday language, then translate it into optional fashion terms.')+'</div>'+ '<p class="small">Suggested cues can be edited or removed. The photo itself is not analyzed by AI yet.</p>'+themeButtons(row)+
  '<div class="row between" style="margin-top:12px"><button class="button-quiet" data-discard="'+row.id+'">Remove</button><button class="button-outline" data-save-one="'+row.id+'">Save inspiration</button></div></article>';
 }
 function showDrafts(){
@@ -57,6 +58,8 @@ el('review-grid').addEventListener('input',e=>{
 el('review-grid').addEventListener('click',e=>{
  const row=drafts.find(x=>x.id===e.target.closest('[data-draft]')?.dataset.draft);
  if(!row)return;
+ const translate=e.target.closest('[data-translate]');
+ if(translate){const result=interpretStyleDescription(row.notes||'');row.tags=[...new Set([...(row.tags||[]),...result.tags])];row.interpretation=result.summary;const card=e.target.closest('[data-draft]');card.querySelector('[data-interpreted]').textContent=result.summary;card.querySelectorAll('[data-theme]').forEach(b=>b.classList.toggle('active',row.tags.includes(b.dataset.theme)));feedback(result.tags.length?'Suggested '+result.tags.length+' editable cues from your words. Confirm or adjust them.':'No clear fashion terms found yet. Try describing the shape, layers, colors, or a specific garment.');return;}
  const theme=e.target.closest('[data-theme]')?.dataset.theme;
  if(theme){row.tags=row.tags.includes(theme)?row.tags.filter(x=>x!==theme):[...row.tags,theme];e.target.classList.toggle('active',row.tags.includes(theme));return;}
  if(e.target.closest('[data-discard]')){drafts=drafts.filter(x=>x.id!==row.id);showDrafts();}
