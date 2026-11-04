@@ -1,4 +1,6 @@
 import {records,save,erase,themeCounts,esc,uid,el,feedback,initNav} from './shared.js';
+import {interpretStyleDescription} from './fashion-language.js';
+import {matchesForGarment,findSimilarUrl} from './retailer-refs.js';
 initNav('stylist');
 const DEMO=[
  ['top1','Tops','tee','white','Regular',['minimal','casual']],
@@ -27,8 +29,10 @@ function rowTags(r){
 }
 function desired(){
  const selected=inspirations.find(x=>x.id===refId);
- if(selected)return [...new Set([...(selected.tags||[]),...String(selected.notes||'').toLowerCase().split(/[,;/]+/).map(x=>x.trim()).filter(x=>x.length>3)])];
- return themeCounts(inspirations).slice(0,7).map(x=>x.label);
+ if(selected)return [...new Set([...(selected.tags||[]),...interpretStyleDescription(selected.notes||'').tags])];
+ const learned=inspirations.flatMap(x=>[...(x.tags||[]),...interpretStyleDescription(x.notes||'').tags]);
+ const counts=new Map();learned.forEach(t=>counts.set(t,(counts.get(t)||0)+1));
+ return [...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,7).map(x=>x[0]);
 }
 function score(rows,direction,references,liked,skipped){
  const tags=rows.flatMap(x=>[...rowTags(x)]);
@@ -54,8 +58,9 @@ function score(rows,direction,references,liked,skipped){
   (Math.random()-.5)*(direction==='Explore'?17:8);
 }
 function candidates(){
- const all=[...wardrobe,...DEMO.filter(d=>!wardrobe.some(w=>w.id===d.id))];
- const by=type=>all.filter(x=>x.category===type),tops=by('Tops'),bottoms=by('Bottoms'),shoes=by('Shoes'),layers=[null,...by('Outerwear')],access=[null,...by('Accessories')];
+ // Use actually uploaded clothing for a category whenever available; demo pieces only fill missing categories.
+ const by=type=>{const owned=wardrobe.filter(x=>x.category===type);return owned.length?owned:DEMO.filter(x=>x.category===type)};
+ const tops=by('Tops'),bottoms=by('Bottoms'),shoes=by('Shoes'),layers=[null,...by('Outerwear')],access=[null,...by('Accessories')];
  const pool=[];
  for(const t of tops)for(const b of bottoms)for(const shoe of shoes)for(const layer of layers){
   if(Math.random()>.65)continue;
