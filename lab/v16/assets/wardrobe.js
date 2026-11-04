@@ -5,19 +5,19 @@ let busy=false;
 const nameFromFile=n=>n.replace(/\.[^.]+$/,'');
 const field=(label,html)=>'<div class="field"><label>'+label+'</label>'+html+'</div>';
 function draftCard(item){
- const select=(key,values)=>'<select data-field="'+key+'">'+options(values,item[key])+'</select>';
+ const select=(key,values)=>'<select data-field="'+key+'">'+(key==='category'?'<option value="">Choose category</option>':key==='kind'?'<option value="">Choose type</option>':'')+options(values,item[key])+'</select>';
  return '<article class="review-item" data-draft="'+esc(item.id)+'"><div class="review-top">'+
    '<img class="thumb" src="'+item.image+'" alt="Uploaded garment">'+
-   '<div><strong>'+esc(item.name)+'</strong><p class="small">'+(item.uncertain?'Garment type is uncertain. Please verify.':'Filename hints available. Please verify.')+'</p>'+
-   '<span class="pill">Approximate image color: '+esc(item.color)+'</span></div></div>'+
+   '<div><strong>'+esc(item.name)+'</strong><p class="small">'+(item.uncertain?'Not recognized: choose category and type.':'Filename hints available: verify this item.')+'</p>'+
+   '<span class="pill">Approximate pixel sample: '+esc(item.estimatedColor||'unavailable')+' (background may affect it)'+'</span></div></div>'+
    '<div class="field-grid">'+
    field('Name','<input data-field="name" value="'+esc(item.name)+'" maxlength="70">')+
    field('Category',select('category',CATEGORIES))+
-   field('Type',select('kind',TYPES[item.category]||TYPES.Tops))+
-   field('Color',select('color',COLORS))+
+   field('Type',select('kind',TYPES[item.category]||[]))+
+   field('Color',select('color',['Unknown',...COLORS]))+
    field('Fit',select('fit',FITS))+
    field('Style notes (optional)','<input data-field="tags" value="'+esc((item.tags||[]).join(', '))+'" placeholder="e.g. casual, cropped, layered">')+
-   '</div><div class="row between" style="margin-top:12px"><span class="small">Review before saving</span><div class="row"><button class="button-quiet" data-discard="'+item.id+'">Remove</button><button class="button-outline" data-save-one="'+item.id+'">Save item</button></div></div></article>';
+   '</div><div class="row between" style="margin-top:12px"><span class="small">Check category and type before saving</span><div class="row"><button class="button-quiet" data-discard="'+item.id+'">Remove</button><button class="button-outline" data-save-one="'+item.id+'">Save item</button></div></div></article>';
 }
 function showDrafts(){
  el('draft-heading').textContent=drafts.length?'Review '+drafts.length+' clothing draft'+(drafts.length===1?'':'s'):'Upload clothing photos';
@@ -43,7 +43,7 @@ async function loadFiles(fileList){
   try{
    const pic=await photo(f);
    const suggestion=guessFilename(nameFromFile(f.name));
-   const item={...suggestion,id:'item:'+uid(),name:suggestion.name==='Untitled garment'?'Clothing item '+(done+1):suggestion.name,color:suggestion.color||pic.estimatedColor,
+   const item={...suggestion,id:'item:'+uid(),name:suggestion.name==='Unidentified clothing item'?'Unidentified item '+(done+1):suggestion.name,color:suggestion.color||'Unknown',estimatedColor:pic.estimatedColor,
      tags:[],image:pic.src,assetKey,sourceName:f.name,createdAt:Date.now(),reviewed:true};
    drafts.push(item);used.add(assetKey);done++;
   }catch(e){failed++;}
@@ -55,6 +55,9 @@ async function loadFiles(fileList){
 }
 async function persist(items){
  if(!items.length)return;
+ const invalid=items.filter(x=>!x.category||!TYPES[x.category]?.includes(x.kind)||!String(x.name||'').trim());
+ if(invalid.length){feedback(invalid.length+' draft(s) still need a category, type or name. Nothing was saved, to avoid incorrect outfit suggestions.',true);return;}
+ for(const x of items){if(/^Unidentified item/i.test(x.name))x.name=[x.color!=='Unknown'?x.color:'',x.kind].filter(Boolean).join(' ').replace(/\\b\\w/g,c=>c.toUpperCase());}
  el('save-all').disabled=true;
  let count=0;
  for(const row of items){try{await save({...row,reviewed:true});count++;drafts=drafts.filter(x=>x.id!==row.id);}catch(e){feedback('Could not save all images: '+e.message,true);break;}}
@@ -72,8 +75,8 @@ el('review-grid').addEventListener('change',e=>{
  const row=e.target.closest('[data-draft]'),item=drafts.find(x=>x.id===row?.dataset.draft);
  if(!item)return;
  if(e.target.dataset.field==='category'){
-   item.category=e.target.value;item.kind=TYPES[item.category][0];
-   row.querySelector('[data-field="kind"]').innerHTML=options(TYPES[item.category],item.kind);
+   item.category=e.target.value;item.kind=item.category?(TYPES[item.category]?.[0]||''):'';
+   row.querySelector('[data-field="kind"]').innerHTML='<option value="">Choose type</option>'+options(TYPES[item.category]||[],item.kind);
  }
 });
 el('review-grid').addEventListener('click',e=>{
