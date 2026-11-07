@@ -70,16 +70,29 @@ function learnedScore(items){
 function scoreCandidate(items,ref,budget){
   const price=priceOf(items);
   const reference=ref?items.reduce((sum,p)=>sum+matchProductToReference(p,ref),0):0;
-  const rating=learnedScore(items);
+  const preferenceMode=['Familiar','Balanced','Experimental'].includes(state.prefs.v16Creativity)?state.prefs.v16Creativity:'Balanced';
+  const rating=learnedScore(items)*(preferenceMode==='Familiar'?1.2:preferenceMode==='Experimental'?0.55:1);
   const fitNotes=items.filter(x=>/relax|loose|wide|oversized/i.test(String(x.fit))).length;
-  let score=11+colorHarmony(items)+Math.min(18,reference*0.40)+rating;
+  const inspirationWeight=preferenceMode==='Familiar'?0.55:preferenceMode==='Experimental'?0.17:0.4;
+  let score=11+colorHarmony(items)+Math.min(20,reference*inspirationWeight)+rating;
+  // Diversity means a visibly different proportion or garment mix, not just a new item ID.
+  const silhouette=items.filter(x=>['top','bottom','outer','shoe'].includes(x.type)).map(x=>x.type+':'+String(x.kind||'').toLowerCase()).sort().join('|');
+  for(const past of shopState.ratings.slice(-12)){
+    const prior=(past.items||[]).map(id=>shopResolved(id)).filter(Boolean).filter(x=>['top','bottom','outer','shoe'].includes(x.type))
+      .map(x=>x.type+':'+String(x.kind||'').toLowerCase()).sort().join('|');
+    if(prior===silhouette)score-=preferenceMode==='Experimental'?11:preferenceMode==='Balanced'?7:3;
+    else if(prior){
+      const part=items.filter(x=>['bottom','shoe','outer'].includes(x.type)).filter(x=>prior.includes(x.type+':'+String(x.kind||'').toLowerCase())).length;
+      score-=part*(preferenceMode==='Experimental'?1.1:0.6);
+    }
+  }
   // Favor variety and layering, without making either mandatory.
   score+=new Set(items.flatMap(x=>(x.tags||[]).slice(0,2))).size*0.24;
   score+=fitNotes>0&&fitNotes<items.length?1.1:0;
   if(items.length===4)score+=0.4;
   if(budget>0)score+=price<=budget?Math.max(0,2-(price/budget)): -Math.min(18,(price-budget)/Math.max(budget,25)*12);
   // Explore first; learning is a gentle influence, not a lock onto preset styles.
-  score+=(Math.random()-0.5)*8;
+  score+=(Math.random()-0.5)*(preferenceMode==='Experimental'?18:preferenceMode==='Familiar'?5:9);
   return {items,ids:items.map(p=>p.id),price,score,signature:sig(items.map(p=>p.id))};
 }
 function generatedName(items){
