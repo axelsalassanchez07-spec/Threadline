@@ -1,5 +1,5 @@
 import {records,save,erase,photo,guessFilename,CATEGORIES,COLORS,FITS,TYPES,esc,uid,el,feedback,options,initNav} from './shared.js';
-import {classifyGarment} from './vision-client.js';
+import {classifyGarment,checkVisionReadiness} from './vision-client.js';
 initNav('wardrobe');
 let drafts=[];
 let busy=false;
@@ -10,7 +10,7 @@ function draftCard(item){
  return '<article class="review-item" data-draft="'+esc(item.id)+'"><div class="review-top">'+
    '<img class="thumb" src="'+item.image+'" alt="Uploaded garment">'+
    '<div><strong>'+esc(item.name)+'</strong><p class="small">'+(item.uncertain?'Not recognized: choose category and type.':'Filename hints available: verify this item.')+'</p>'+
-   '<span class="pill">Approximate pixel sample: '+esc(item.estimatedColor||'unavailable')+' (background may affect it)'+'</span></div></div>'+
+   '<span class="pill">Approximate pixel sample: '+esc(item.estimatedColor||'unavailable')+' (background may affect it)'+'</span>'+(item.visionNote?'<p class="small">AI explanation: '+esc(item.visionNote)+'</p>':'')+'</div></div>'+
    '<div class="field-grid">'+
    field('Name','<input data-field="name" value="'+esc(item.name)+'" maxlength="70">')+
    field('Category',select('category',CATEGORIES))+
@@ -18,7 +18,7 @@ function draftCard(item){
    field('Color',select('color',['Unknown',...COLORS]))+
    field('Fit',select('fit',FITS))+
    field('Style notes (optional)','<input data-field="tags" value="'+esc((item.tags||[]).join(', '))+'" placeholder="e.g. casual, cropped, layered">')+
-   '</div><label class="row" style="margin:10px 0;font-size:12px;font-weight:650"><input type="checkbox" data-confirm="1" '+((item.categoryConfirmedByUser||item.verifiedCategory===true)?'checked':'')+' style="width:16px;height:16px;accent-color:#395b40"> I checked this category and type against the photo</label><div class="row between" style="margin-top:12px"><span class="small">Verify before saving</span><div class="row"><button type="button" class="button-outline" data-ai="'+esc(item.id)+'">✨ Analyze with AI</button><button class="button-quiet" data-discard="'+item.id+'">Remove</button><button class="button-outline" data-save-one="'+item.id+'">Save item</button></div></div></article>';
+   '</div><label class="row" style="margin:10px 0;font-size:12px;font-weight:650"><input type="checkbox" data-confirm="1" '+(((item.categoryConfirmedByUser||item.verifiedCategory===true)&&item.category&&TYPES[item.category]?.includes(item.kind))?'checked':'')+(!item.category||!TYPES[item.category]?.includes(item.kind)?'disabled':'')+' style="width:16px;height:16px;accent-color:#395b40"> I checked this category and type against the photo</label><div class="row between" style="margin-top:12px"><span class="small">Verify before saving</span><div class="row"><button type="button" class="button-outline" data-ai="'+esc(item.id)+'">✨ Analyze with AI</button><button class="button-quiet" data-discard="'+item.id+'">Remove</button><button class="button-outline" data-save-one="'+item.id+'">Save item</button></div></div><p class="small" data-ai-message role="status" aria-live="polite"></p></article>';
 }
 function showDrafts(){
  el('draft-heading').textContent=drafts.length?'Review '+drafts.length+' clothing draft'+(drafts.length===1?'':'s'):'Upload clothing photos';
@@ -77,30 +77,44 @@ el('review-grid').addEventListener('input',e=>{
 el('review-grid').addEventListener('change',e=>{
  const row=e.target.closest('[data-draft]'),item=drafts.find(x=>x.id===row?.dataset.draft);
  if(!item)return;
- if(e.target.dataset.confirm){item.categoryConfirmedByUser=e.target.checked;return;}
+ if(e.target.dataset.confirm){item.categoryConfirmedByUser=Boolean(e.target.checked&&item.category&&TYPES[item.category]?.includes(item.kind));return;}
+ if(e.target.dataset.field==='kind'){item.kind=e.target.value;item.categoryConfirmedByUser=false;item.verifiedCategory=false;row.querySelector('[data-confirm]').checked=false;row.querySelector('[data-confirm]').disabled=!TYPES[item.category]?.includes(item.kind);return;}
  if(e.target.dataset.field==='category'){
-   item.category=e.target.value;item.kind=item.category?(TYPES[item.category]?.[0]||''):'';
+   item.category=e.target.value;item.kind='';item.categoryConfirmedByUser=false;item.verifiedCategory=false;
    row.querySelector('[data-field="kind"]').innerHTML='<option value="">Choose type</option>'+options(TYPES[item.category]||[],item.kind);
+   row.querySelector('[data-confirm]').checked=false;row.querySelector('[data-confirm]').disabled=true;
  }
 });
 el('review-grid').addEventListener('click',e=>{
  const ai=e.target.closest('[data-ai]');
  if(ai){
   const item=drafts.find(x=>x.id===ai.dataset.ai);if(!item)return;
-  if(!confirm('Send this clothing photo to an AI vision provider through the authenticated Supabase function? The classification will only become a draft for your review.'))return;
-  ai.disabled=true;ai.textContent='Analyzing…';
-  void classifyGarment(item.image).then(result=>{
-   const category=CATEGORIES.includes(result.category)?result.category:'';
-   item.category=category&&TYPES[category]?.includes(result.kind)?category:'';
-   item.kind=item.category?result.kind:'';
-   item.name=String(result.name||item.name).slice(0,70);
-   item.color=COLORS.includes(result.color)?result.color:'Unknown';
-   item.fit=FITS.includes(result.fit)?result.fit:'Unknown';
-   item.tags=Array.isArray(result.tags)?result.tags.map(x=>String(x).toLowerCase()).slice(0,4):[];
-   item.uncertain=result.confidence!=='high';
-   item.visionNote=String(result.note||'Please check this suggestion.').slice(0,300);
-   showDrafts();feedback('AI provided a '+result.confidence+'-confidence suggestion: '+item.visionNote+' Review every field before saving.');
-  }).catch(err=>{ai.disabled=false;ai.textContent='✨ Analyze with AI';feedback('AI classification unavailable: '+(err.message||err),true);});
+  ai.disabled=true;ai.textContent='Checking AI service…';
+  void (async()=>{
+   try{
+    // Do not ask users to consent to photo transfer if no model is actually configured.
+    await checkVisionReadiness();
+    if(!confirm('AI image recognition is available. Send this clothing photo through Supabase to the vision provider? It will return an editable suggestion, not automatically save the item.'))return;
+    ai.textContent='Analyzing photo…';
+    const result=await classifyGarment(item.image);
+    const category=CATEGORIES.includes(result.category)?result.category:'';
+    item.category=category&&TYPES[category]?.includes(result.kind)?category:'';
+    item.kind=item.category?result.kind:'';
+    item.name=String(result.name||item.name).slice(0,70);
+    item.color=COLORS.includes(result.color)?result.color:'Unknown';
+    item.fit=FITS.includes(result.fit)?result.fit:'Unknown';
+    item.tags=Array.isArray(result.tags)?result.tags.map(x=>String(x).toLowerCase()).slice(0,4):[];
+    item.uncertain=result.confidence!=='high';
+    item.visionNote=String(result.note||'Please check this suggestion.').slice(0,300);
+    item.categoryConfirmedByUser=false;item.verifiedCategory=false;
+    showDrafts();
+    feedback('AI returned a '+result.confidence+'-confidence suggestion: '+item.visionNote+'. Check the category and type before saving.');
+   }catch(err){
+    const explanation='AI recognition is not ready: '+(err.message||err)+'. Camera upload and manual review still work.';
+    const inline=ai.closest('[data-draft]')?.querySelector('[data-ai-message]');if(inline){inline.textContent=explanation;inline.style.color='#ad4c38';}
+    feedback(explanation,true);
+   }finally{ai.disabled=false;ai.textContent='✨ Analyze with AI';}
+  })();
   return;
  }
  const del=e.target.closest('[data-discard]'),single=e.target.closest('[data-save-one]');
