@@ -125,13 +125,21 @@ function cardHTML(result,i){
  const items=result.pieces.map(shopResolved).filter(Boolean);
  const styles={Recreate:'Keep the strongest inspiration signals and familiar garment choices.',Reinterpret:'Keep some familiar elements while changing proportions, textures or footwear.',Explore:'Try a less familiar mix of wardrobe and retailer options.'};
  const amount=items.reduce((v,p)=>v+(p.owned?0:Number(p.price)||0),0);
+ const top=items.find(x=>x.type==='top'),bottom=items.find(x=>x.type==='bottom'),shoes=items.find(x=>x.type==='shoe'),outer=items.find(x=>x.type==='outer');
+ const palette=[...new Set(items.map(x=>x.color).filter(Boolean))].slice(0,3).join(', ');
+ const explain='Combines '+[top?.kind||'a top',bottom?.kind||'a bottom',shoes?.kind||'shoes'].join(' + ')+
+  (outer?' with '+outer.kind+' as an extra layer.':'.')+
+  (palette?' The palette uses '+palette+'.':'')+
+  ' Try swapping one category to change the overall silhouette.';
+ const outfitQuery=items.map(x=>x.kind).filter(Boolean).join(' ')+' outfit street style';
+ const fullOutfitSearch='https://www.google.com/search?tbm=isch&q='+encodeURIComponent(outfitQuery);
  const links=items.filter(x=>!x.owned).slice(0,3).map(p=>'<a href="'+safe(similarSearch(p))+'" target="_blank" rel="noopener noreferrer">Find similar '+safe(p.kind)+' ↗</a>').join(' · ');
  return '<article class="v16-direction"><span class="v16-kicker">'+safe(result.direction)+'</span><h3>'+safe(result.name)+'</h3>'+
- '<p class="small muted">'+styles[result.direction]+'</p>'+
+ '<p class="small muted">'+styles[result.direction]+'</p><p class="small muted">'+safe(explain)+'</p>'+
  '<div class="v16-products">'+items.map(productTile).join('')+'</div>'+
  '<p class="small muted">One top, one bottom, one pair of shoes; a jacket is optional. Images show individual items, not a rendered full outfit.</p>'+
  '<p class="v16-direction-cost">Estimated to buy: '+shopMoney(amount)+'</p>'+
- '<div class="v16-shopping-search">'+(links||'All pieces are from your wardrobe.')+'</div>'+
+ '<div class="v16-shopping-search"><a href="'+safe(fullOutfitSearch)+'" target="_blank" rel="noopener noreferrer">See full-outfit photo references ↗</a><div style="margin-top:5px">'+(links||'All pieces are from your wardrobe.')+'</div></div>'+
  '<button class="btn btn-primary btn-small" data-v16-use-direction="'+i+'">Use this combination</button></article>';
 }
 function directionHTML(){
