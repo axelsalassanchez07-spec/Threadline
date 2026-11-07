@@ -5,14 +5,14 @@ const origin="https://axelsalassanchez07-spec.github.io";
 const cors={"Access-Control-Allow-Origin":origin,"Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Vary":"Origin"};
 const reply=(obj,status=200)=>new Response(JSON.stringify(obj),{status,headers:{...cors,"Content-Type":"application/json","Cache-Control":"no-store"}});
 const categories=["Tops","Outerwear","Bottoms","Shoes","Accessories","Unknown"];
-const colors=["black","white","cream","gray","charcoal","navy","blue","brown","beige","tan","olive","green","burgundy","red","Unknown"];
+const colors=["black","white","cream","gray","charcoal","navy","blue","brown","beige","tan","olive","green","burgundy","red","multicolor","Unknown"];
 const fits=["Unknown","Regular","Relaxed","Straight","Oversized","Structured"];
 const kinds={
- Tops:["tee","graphic tee","oxford shirt","button-up","rugby shirt","knit polo","hoodie","sweater","shirt","other top"],
- Outerwear:["chore jacket","denim jacket","bomber jacket","leather jacket","blazer","cardigan","track jacket","coat","overshirt","other layer"],
- Bottoms:["jeans","wide-leg trousers","pleated trousers","chinos","cargo pants","shorts","skirt","other bottoms"],
- Shoes:["retro sneakers","sneakers","loafers","boots","dress shoes","sandals","other shoes"],
- Accessories:["cap","hat","belt","bag","watch","scarf","other accessory"],
+ Tops:["tee","graphic tee","long-sleeve tee","jersey","rugby shirt","polo shirt","knit polo","oxford shirt","dress shirt","button-up","tank top","turtleneck","hoodie","sweatshirt","sweater","vest","shirt","other top"],
+ Outerwear:["chore jacket","denim jacket","bomber jacket","leather jacket","blazer","cardigan","track jacket","windbreaker","raincoat","puffer jacket","coat","overshirt","other layer"],
+ Bottoms:["jeans","wide-leg trousers","pleated trousers","dress trousers","chinos","cargo pants","joggers","sweatpants","track pants","shorts","cargo shorts","skirt","other bottoms"],
+ Shoes:["retro sneakers","running sneakers","sneakers","loafers","boots","dress boots","dress shoes","sandals","slides","clogs","other shoes"],
+ Accessories:["cap","beanie","hat","belt","bag","backpack","watch","scarf","sunglasses","other accessory"],
  Unknown:[]
 };
 const themes=["relaxed","structured","oversized","cropped","wide-leg","tailored","layered","minimal","vintage","workwear","sporty","streetwear","preppy","formal","earth tones","monochrome","contrasting colors","textured","denim","technical","experimental"];
