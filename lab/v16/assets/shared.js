@@ -1,4 +1,4 @@
-/* THREADLINE V1.6 LAB — isolated browser-only workspace. Nothing is sent to Supabase. */
+/* THREADLINE V1.6 LAB — local IndexedDB workspace. Selected photos are sent externally ONLY after explicit opt-in to AI analysis; no automatic cloud upload. */
 export const STORE='threadline_v16_lab_records';
 export const CATEGORIES=['Tops','Outerwear','Bottoms','Shoes','Accessories'];
 export const COLORS=['Unknown','black','white','cream','gray','charcoal','navy','blue','brown','beige','tan','olive','green','burgundy','red','multicolor'];
