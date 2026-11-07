@@ -112,12 +112,23 @@ el('review-grid').addEventListener('click',e=>{
  const ai=e.target.closest('[data-ai]');
  if(ai){
   const item=drafts.find(x=>x.id===ai.dataset.ai);if(!item)return;
-  if(!confirm('Send this clothing photo to an AI vision provider through the authenticated Supabase function? The classification will only become a draft for your review.'))return;
-  ai.disabled=true;ai.textContent='Analyzing…';
-  void classifyGarment(item.image).then(result=>{
-   assignVision(item,result);
-   showDrafts();feedback('AI provided a '+result.confidence+'-confidence suggestion: '+item.visionNote+' Review every field before saving.');
-  }).catch(err=>{ai.disabled=false;ai.textContent='✨ Analyze with AI';feedback('AI classification unavailable: '+(err.message||err),true);});
+  ai.disabled=true;ai.textContent='Checking AI service…';
+  void (async()=>{
+   try{
+    // Never ask consent to send a photo until authenticated AI service is actually enabled.
+    await checkVisionReadiness();
+    if(!confirm('AI is ready. Send this photo through Supabase to the vision provider? The result will be editable and not saved automatically.'))return;
+    ai.textContent='Analyzing photo…';
+    const result=await classifyGarment(item.image);
+    assignVision(item,result);showDrafts();
+    feedback('AI returned a '+result.confidence+'-confidence suggestion. Verify its garment category and type before saving.');
+   }catch(err){
+    const msg='AI not ready: '+(err.message||err)+'. Continue with local photo review.';
+    const inline=ai.closest('[data-draft]')?.querySelector('[data-ai-message]');
+    if(inline){inline.textContent=msg;inline.style.color='#a64f3a';}
+    feedback(msg,true);
+   }finally{ai.disabled=false;ai.textContent='✨ Analyze with AI';}
+  })();
   return;
  }
  const del=e.target.closest('[data-discard]'),single=e.target.closest('[data-save-one]');
