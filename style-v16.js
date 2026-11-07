@@ -177,7 +177,8 @@ function generateDirections(){
    const ids=(shopState.swaps.discovery||look.pieces||[]).slice();
    const fingerprint=ids.sort().join('|');
    const shape=ids.map(id=>shopResolved(id)).filter(Boolean).filter(x=>['bottom','shoe'].includes(x.type)).map(x=>x.kind).join('|');
-   if(!seen.has(shape)&&!seen.has(fingerprint)||attempts>=6){
+   // Never dress up a near-identical silhouette as a genuinely new direction.
+   if(!seen.has(shape)&&!seen.has(fingerprint)){
     collected.push({...look,direction,pieces:(shopState.swaps.discovery||look.pieces).slice()});
     seen.add(shape);seen.add(fingerprint);break;
    }
@@ -185,7 +186,7 @@ function generateDirections(){
  }
  state.prefs.v16Creativity=originalMode;
  directions=collected;
- if(collected.length){setLook(collected[0]);const anchor=document.getElementById('v16-directions');if(anchor)anchor.scrollIntoView({behavior:'smooth',block:'start'});}
+ if(collected.length){setLook(collected[0]);if(collected.length<3)toast('Only '+collected.length+' genuinely different outfit direction(s) found in your current catalog and closet. More clothing will help.');const anchor=document.getElementById('v16-directions');if(anchor)anchor.scrollIntoView({behavior:'smooth',block:'start'});}
  else{
   shopState.selected=initial.selected;shopState.customLook=initial.customLook;shopState.swaps.discovery=initial.discovery;shopStore();render();
   toast('No more unrated combinations in this catalog. Add clothing or try a new inspiration.');
