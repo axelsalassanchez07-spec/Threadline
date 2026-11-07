@@ -7,7 +7,7 @@ const reply=(obj,status=200)=>new Response(JSON.stringify(obj),{status,headers:{
 const categories=["Tops","Outerwear","Bottoms","Shoes","Accessories","Unknown"];
 const colors=["black","white","cream","gray","charcoal","navy","blue","brown","beige","tan","olive","green","burgundy","red","multicolor","Unknown"];
 const fits=["Unknown","Regular","Relaxed","Straight","Oversized","Structured"];
-const kinds={
+const kinds: Record<string,string[]>={
  Tops:["tee","graphic tee","long-sleeve tee","jersey","rugby shirt","polo shirt","knit polo","oxford shirt","dress shirt","button-up","tank top","turtleneck","hoodie","sweatshirt","sweater","vest","shirt","other top"],
  Outerwear:["chore jacket","denim jacket","bomber jacket","leather jacket","blazer","cardigan","track jacket","windbreaker","raincoat","puffer jacket","coat","overshirt","other layer"],
  Bottoms:["jeans","wide-leg trousers","pleated trousers","dress trousers","chinos","cargo pants","joggers","sweatpants","track pants","shorts","cargo shorts","skirt","other bottoms"],
@@ -41,7 +41,8 @@ const inspirationSchema={
  },
  required:["summary","styleExplanation","dominantColors","tags","garments","developmentIdeas","confidence","note"]
 };
-const unique=(array,allowed,max)=>Array.isArray(array)?[...new Set(array.filter(x=>typeof x==="string"&&(!allowed||allowed.includes(x))))].slice(0,max):[];
+const unique=(array:unknown,allowed:string[]|null,max:number):string[]=>
+ Array.isArray(array)?[...new Set(array.filter((x:unknown):x is string=>typeof x==="string"&&(!allowed||allowed.includes(x))))].slice(0,max):[];
 Deno.serve(async request=>{
  if(request.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
  if(request.method!=="POST")return reply({error:"POST required."},405);
@@ -58,10 +59,10 @@ Deno.serve(async request=>{
  if(error||!data?.user)return reply({error:"A valid signed-in account is required."},401);
  const allow=(Deno.env.get("VISION_ALLOWED_EMAILS")||"").toLowerCase().split(",").map(s=>s.trim()).filter(Boolean);
  if(!data.user.email||!allow.includes(data.user.email.toLowerCase()))return reply({error:"This vision preview is restricted to approved testers."},403);
- let body;
- try{body=await request.json();}catch{return reply({error:"Malformed JSON body."},400);}
+ let body:Record<string,unknown>;
+ try{body=await request.json() as Record<string,unknown>;}catch{return reply({error:"Malformed JSON body."},400);}
  const task=body?.task;
- if(!["garment","inspiration"].includes(task))return reply({error:"Unknown analysis task."},400);
+ if(typeof task!=="string"||!["garment","inspiration"].includes(task))return reply({error:"Unknown analysis task."},400);
  const image=body?.image;
  if(typeof image!=="string"||image.length>2500000||!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(image))
   return reply({error:"Choose a compressed JPG, PNG, or WebP photo under 2 MB."},413);
@@ -107,7 +108,7 @@ Deno.serve(async request=>{
   });
   if(!upstream.ok)return reply({error:"Visual analysis is temporarily unavailable. Review items manually."},502);
   const response=await upstream.json();
-  const output=(response.output||[]).flatMap(item=>Array.isArray(item.content)?item.content:[]);
+  const output=(Array.isArray(response.output)?response.output:[]).flatMap((item:any)=>Array.isArray(item.content)?item.content:[]);
   const raw=output.find(x=>x?.type==="output_text")?.text;
   if(typeof raw!=="string")return reply({error:"The model could not provide structured analysis."},502);
   const parsed=JSON.parse(raw);
@@ -128,7 +129,7 @@ Deno.serve(async request=>{
    styleExplanation:String(parsed.styleExplanation||"").slice(0,600),
    dominantColors:unique(parsed.dominantColors,null,6).map(x=>x.slice(0,30)),
    tags:unique(parsed.tags,themes,7),
-   garments:Array.isArray(parsed.garments)?parsed.garments.slice(0,12).map(x=>({
+   garments:Array.isArray(parsed.garments)?parsed.garments.slice(0,12).map((x:any)=>({
     category:categories.includes(x.category)?x.category:"Unknown",
     description:String(x.description||"").slice(0,100)})):[],
    developmentIdeas:unique(parsed.developmentIdeas,null,3).map(x=>x.slice(0,220)),
