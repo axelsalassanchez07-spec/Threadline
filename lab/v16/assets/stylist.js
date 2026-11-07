@@ -95,11 +95,20 @@ function chooseLooks(){
  }
  return out;
 }
+const fallbackGlyph={Tops:'👕',Bottoms:'👖',Shoes:'👟',Outerwear:'🧥',Accessories:'🧢'};
+function imageWithFallback(url,label,category){
+ const fallback='<div class="photo-unavailable" '+(url?'hidden':'')+'><span aria-hidden="true">'+(fallbackGlyph[category]||'📷')+'</span><small>Image unavailable<br>'+esc(label||'Garment reference')+'</small></div>';
+ return '<div class="image-fallback-shell">'+(url?'<img loading="lazy" data-image-fallback="true" src="'+esc(url)+'" alt="'+esc(label||'Garment reference')+'">':'')+fallback+'</div>';
+}
+document.addEventListener('error',event=>{
+ const img=event.target;
+ if(!(img instanceof HTMLImageElement)||!img.hasAttribute('data-image-fallback'))return;
+ img.hidden=true;
+ const box=img.parentElement?.querySelector('.photo-unavailable');if(box)box.hidden=false;
+},true);
 function pieceView(x){
  const matches=matchesForGarment(x),reference=matches[0];
- const picture=x.image?'<img loading="lazy" src="'+esc(x.image)+'" alt="'+esc(x.name)+'">':
-   reference?.image?'<img loading="lazy" src="'+esc(reference.image)+'" alt="Similar catalog example: '+esc(reference.name)+'">':
-   '<div class="placeholder">'+esc(x.kind||'Unidentified item')+'</div>';
+ const picture=imageWithFallback(x.image||reference?.image||'',x.image?x.name:(reference?'Example: '+reference.name:x.kind),x.category);
  return '<div class="piece"><span class="piece-role">'+esc(SLOT_LABELS[x.category]||'ITEM')+'</span>'+picture+
    '<span>'+esc(x.name)+'<br>'+esc(x.color||'Unknown')+' · '+esc(x.fit||'Unknown')+'</span>'+
    (reference&&!x.image?'<span class="retailer-note">Example product photo, not this exact item</span>':'')+'</div>';
@@ -112,7 +121,7 @@ function shoppingReferences(o){
  }
  const shopping=examples.slice(0,4).map(p=>
    '<a class="retailer-example" href="'+esc(p.url)+'" target="_blank" rel="noopener noreferrer">'+
-   (p.image?'<img loading="lazy" src="'+esc(p.image)+'" alt="'+esc(p.name)+'">':'')+
+   imageWithFallback(p.image,p.name,({top:'Tops',bottom:'Bottoms',shoe:'Shoes',outer:'Outerwear',accessory:'Accessories'})[p.type]||'Tops')+
    '<span>'+esc(p.name)+'<small>'+esc(p.store)+' · saved price reference '+(Number.isFinite(p.price)?'$'+Number(p.price).toFixed(2):'not available')+'</small></span></a>'
  ).join('');
  const similar=o.items.filter(x=>x.category!=='Accessories').map(x=>
@@ -121,7 +130,7 @@ function shoppingReferences(o){
  const lookQuery=o.items.map(x=>x.kind).filter(Boolean).join(' ')+' outfit styling references';
  const photoSearch='https://www.google.com/search?tbm=isch&q='+encodeURIComponent(lookQuery);
  return '<div class="retailer-section"><strong>Shopping alternatives — not additional pieces in this outfit</strong>'+
-   '<p class="small">Retailer examples below come from the original limited catalog; these are not live listings and might not exactly match the generated garments.</p>'+
+   '<p class="small">Reference photos are supplied by retailer websites and may expire or block embedding. If an image fails, the garment label and shopping link still work. These are examples, not a photo of the assembled outfit.</p>'+
    (shopping?'<div class="retailer-grid">'+shopping+'</div>':'<p class="small">No sufficiently similar image exists in the starter catalog for these garments.</p>')+
    '<div class="shopping-search"><a href="'+esc(photoSearch)+'" target="_blank" rel="noopener noreferrer">See full-outfit photo ideas ↗</a> · '+similar+'</div></div>';
 }
@@ -130,7 +139,7 @@ function inspirationPreview(){
  const examples=selected?[selected]:inspirations.slice(0,2);
  if(!examples.length)return '';
  return '<div class="inspo-reference"><strong>Your saved inspiration (reference, not an outfit render)</strong>'+
-    '<div class="inspo-reference-images">'+examples.map(x=>'<img loading="lazy" src="'+esc(x.image)+'" alt="'+esc(x.name)+'">').join('')+'</div>'+
+    '<div class="inspo-reference-images">'+examples.map(x=>imageWithFallback(x.image,x.name,'')).join('')+'</div>'+
     '<p class="small">'+examples.map(x=>esc(x.name)).join(' · ')+'</p></div>';
 }
 function card(o){
