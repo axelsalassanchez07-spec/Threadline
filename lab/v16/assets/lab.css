@@ -47,3 +47,5 @@
 .analysis-result ul{margin:6px 0;padding-left:19px;color:#526c57}
 .analysis-result li{margin:4px 0}
 @media(max-width:640px){.outfit .piece .image-fallback-shell{height:92px}.inspo-reference-images .image-fallback-shell{height:78px;width:61px}.batch-tools .row{align-items:stretch}.batch-tools .button,.batch-tools .button-outline{min-height:40px}}
+
+.outfit .piece .image-fallback-shell img{width:100%;height:100%;object-fit:contain}
