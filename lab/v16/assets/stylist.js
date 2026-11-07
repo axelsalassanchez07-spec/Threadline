@@ -140,7 +140,10 @@ function inspirationPreview(){
  if(!examples.length)return '';
  return '<div class="inspo-reference"><strong>Your saved inspiration (reference, not an outfit render)</strong>'+
     '<div class="inspo-reference-images">'+examples.map(x=>imageWithFallback(x.image,x.name,'')).join('')+'</div>'+
-    '<p class="small">'+examples.map(x=>esc(x.name)).join(' · ')+'</p></div>';
+    '<p class="small">'+examples.map(x=>esc(x.name)).join(' · ')+'</p>'+
+    examples.filter(x=>x.aiAnalysis?.summary).map(x=>'<div class="summary"><strong>AI-suggested styling insight:</strong> '+esc(x.aiAnalysis.summary)+
+      (x.aiAnalysis.developmentIdeas?.length?'<p class="small">A possible direction: '+esc(x.aiAnalysis.developmentIdeas[0])+'</p>':'')+
+    '</div>').join('')+'</div>';
 }
 function card(o){
  return '<article class="outfit"><span class="eyebrow">'+esc(o.direction||'Archived')+' · '+(o.items.some(x=>x.demo)?'includes demonstration pieces':'from your wardrobe')+'</span>'+
