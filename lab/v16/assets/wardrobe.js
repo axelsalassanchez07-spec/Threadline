@@ -10,7 +10,7 @@ function draftCard(item){
  return '<article class="review-item" data-draft="'+esc(item.id)+'"><div class="review-top">'+
    '<img class="thumb" src="'+item.image+'" alt="Uploaded garment">'+
    '<div><strong>'+esc(item.name)+'</strong><p class="small">'+(item.uncertain?'Not recognized: choose category and type.':'Filename hints available: verify this item.')+'</p>'+
-   '<span class="pill">Approximate pixel sample: '+esc(item.estimatedColor||'unavailable')+' (background may affect it)'+'</span></div></div>'+
+   '<span class="pill">Approximate pixel sample: '+esc(item.estimatedColor||'unavailable')+' (background may affect it)'+'</span>'+(item.visionNote?'<p class="small">AI explanation: '+esc(item.visionNote)+'</p>':'')+'</div></div>'+
    '<div class="field-grid">'+
    field('Name','<input data-field="name" value="'+esc(item.name)+'" maxlength="70">')+
    field('Category',select('category',CATEGORIES))+
@@ -18,7 +18,7 @@ function draftCard(item){
    field('Color',select('color',['Unknown',...COLORS]))+
    field('Fit',select('fit',FITS))+
    field('Style notes (optional)','<input data-field="tags" value="'+esc((item.tags||[]).join(', '))+'" placeholder="e.g. casual, cropped, layered">')+
-   '</div><label class="row" style="margin:10px 0;font-size:12px;font-weight:650"><input type="checkbox" data-confirm="1" '+(((item.categoryConfirmedByUser||item.verifiedCategory===true)&&item.category&&TYPES[item.category]?.includes(item.kind))?'checked':'')+(!item.category||!TYPES[item.category]?.includes(item.kind)?'disabled':'')+' style="width:16px;height:16px;accent-color:#395b40"> I checked this category and type against the photo</label><div class="row between" style="margin-top:12px"><span class="small">Verify before saving</span><div class="row"><button type="button" class="button-outline" data-ai="'+esc(item.id)+'">✨ Analyze with AI</button><button class="button-quiet" data-discard="'+item.id+'">Remove</button><button class="button-outline" data-save-one="'+item.id+'">Save item</button></div></div></article>';
+   '</div><label class="row" style="margin:10px 0;font-size:12px;font-weight:650"><input type="checkbox" data-confirm="1" '+(((item.categoryConfirmedByUser||item.verifiedCategory===true)&&item.category&&TYPES[item.category]?.includes(item.kind))?'checked':'')+(!item.category||!TYPES[item.category]?.includes(item.kind)?'disabled':'')+' style="width:16px;height:16px;accent-color:#395b40"> I checked this category and type against the photo</label><div class="row between" style="margin-top:12px"><span class="small">Verify before saving</span><div class="row"><button type="button" class="button-outline" data-ai="'+esc(item.id)+'">✨ Analyze with AI</button><button class="button-quiet" data-discard="'+item.id+'">Remove</button><button class="button-outline" data-save-one="'+item.id+'">Save item</button></div></div><p class="small" data-ai-message role="status" aria-live="polite"></p></article>';
 }
 function showDrafts(){
  el('draft-heading').textContent=drafts.length?'Review '+drafts.length+' clothing draft'+(drafts.length===1?'':'s'):'Upload clothing photos';
@@ -110,7 +110,9 @@ el('review-grid').addEventListener('click',e=>{
     showDrafts();
     feedback('AI returned a '+result.confidence+'-confidence suggestion: '+item.visionNote+'. Check the category and type before saving.');
    }catch(err){
-    feedback('AI recognition is not ready: '+(err.message||err)+' Camera upload and manual review are still available.',true);
+    const explanation='AI recognition is not ready: '+(err.message||err)+'. Camera upload and manual review still work.';
+    const inline=ai.closest('[data-draft]')?.querySelector('[data-ai-message]');if(inline){inline.textContent=explanation;inline.style.color='#ad4c38';}
+    feedback(explanation,true);
    }finally{ai.disabled=false;ai.textContent='✨ Analyze with AI';}
   })();
   return;
