@@ -1,6 +1,6 @@
 import {records,save,erase,photo,THEMES,esc,uid,el,feedback,themeCounts,initNav} from './shared.js';
 import {interpretStyleDescription} from './fashion-language.js';
-import {analyzeInspiration} from './vision-client.js';
+import {analyzeInspiration,checkVisionReadiness} from './vision-client.js';
 initNav('inspiration');
 let drafts=[],busy=false;
 function themeButtons(row){
@@ -70,9 +70,13 @@ el('review-grid').addEventListener('click',e=>{
  if(!row)return;
  const ai=e.target.closest('[data-vision-inspo]');
  if(ai){
-  if(!confirm('Send this inspiration photo and your optional description to the AI provider through Supabase? This will create editable suggestions, not save them automatically.'))return;
-  ai.disabled=true;ai.textContent='Interpreting photo…';
-  void analyzeInspiration(row.image,row.notes||'').then(result=>{
+  ai.disabled=true;ai.textContent='Checking AI service…';
+  void (async()=>{
+   try{
+    await checkVisionReadiness();
+    if(!confirm('AI is ready. Send this inspiration photo and your optional description to the vision provider? Suggestions will remain editable and unsaved until you review them.'))return;
+    ai.textContent='Interpreting photo…';
+    const result=await analyzeInspiration(row.image,row.notes||'');
    row.tags=[...new Set([...(row.tags||[]),...(Array.isArray(result.tags)?result.tags.filter(x=>THEMES.includes(x)):[])])];
    row.aiAnalysis={
     summary:String(result.summary||'').slice(0,240),styleExplanation:String(result.styleExplanation||'').slice(0,600),
@@ -81,7 +85,9 @@ el('review-grid').addEventListener('click',e=>{
     developmentIdeas:Array.isArray(result.developmentIdeas)?result.developmentIdeas.slice(0,3):[]
    };
    showDrafts();feedback('Photo interpretation returned. Review the analysis and correct any tags before saving.');
-  }).catch(err=>{ai.disabled=false;ai.textContent='✨ Interpret the photo with AI';feedback('AI photo interpretation unavailable: '+(err.message||err),true);});
+   }catch(err){feedback('AI photo interpretation is not ready: '+(err.message||err)+'. Text notes and manual tags still work.',true);}
+   finally{ai.disabled=false;ai.textContent='✨ Interpret the photo with AI';}
+  })();
   return;
  }
  const translate=e.target.closest('[data-translate]');
