@@ -54,6 +54,9 @@ Deno.serve(async(req)=>{
  if(!allowed.length||!data.user.email||!allowed.includes(data.user.email.toLowerCase()))return reply({error:"This preview is limited to approved test accounts."},403);
  let body:Record<string,unknown>;
  try{body=await req.json();}catch{return reply({error:"Malformed request."},400)}
+ if(body.task==="status"){
+  return reply({ready:Boolean(Deno.env.get("OPENAI_API_KEY")),status:Deno.env.get("OPENAI_API_KEY")?"configured":"missing-provider-key"});
+ }
  if(body.task!=="garment"||typeof body.image!=="string")return reply({error:"Provide one garment image."},400);
  // Cap per-request input size well below provider limits; don't send an entire photo album.
  const image=body.image;
