@@ -107,7 +107,26 @@ Deno.serve(async request=>{
     text:{format:{type:"json_schema",name:task==="garment"?"threadline_garment":"threadline_inspiration",strict:true,schema}}
    })
   });
-  if(!upstream.ok)return reply({error:"Visual analysis is temporarily unavailable. Review items manually."},502);
+  if(!upstream.ok){
+   // Never log raw provider responses, credentials, image contents, or user identifiers.
+   let code="";
+   try{
+    const detail=await upstream.json();
+    const raw=detail?.error?.code;
+    if(typeof raw==="string"&&/^[a-z0-9_-]{1,80}$/i.test(raw))code=raw;
+   }catch{/* no provider diagnostic payload */}
+   console.warn("THREADLINE vision provider rejected request",JSON.stringify({status:upstream.status,code:code||"unspecified",task}));
+   const creditCodes=["credit_balance_exhausted","insufficient_quota","project_spend_limit_exceeded","organization_spend_limit_exceeded","organization_usage_limit_exceeded"];
+   let message="The AI provider could not complete this image analysis.";
+   if(upstream.status===401)message="The AI provider rejected the server API key. Check OPENAI_API_KEY in Supabase Secrets.";
+   else if(upstream.status===403)message="The AI provider denied access. Check the API project's model permissions.";
+   else if(upstream.status===404)message="The configured AI model was not found or is unavailable to this API project.";
+   else if(upstream.status===429&&creditCodes.includes(code))message="The AI API has no available credits or has reached its spending/usage limit. Check the API account's billing and limits.";
+   else if(upstream.status===429)message="The AI API rate limit was reached. Try another single image later.";
+   else if(upstream.status===400)message="The AI provider rejected the request format. The THREADLINE vision integration needs adjustment.";
+   else if(upstream.status>=500)message="The AI provider is temporarily unavailable. Try again later.";
+   return reply({error:message,provider_status:upstream.status,provider_code:code||"unspecified"},502);
+  }
   const response=await upstream.json();
   const output=(Array.isArray(response.output)?response.output:[]).flatMap((item:any)=>Array.isArray(item.content)?item.content:[]);
   const raw=output.find(x=>x?.type==="output_text")?.text;
