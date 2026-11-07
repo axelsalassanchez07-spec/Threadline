@@ -36,109 +36,32 @@ function sig(ids){return ids.slice().sort().join('|')}
 function roster(type){
   const catalog=SHOP_PRODUCTS.filter(p=>p.type===type).map(p=>({ ...p,owned:shopState.ownedProductIds.includes(p.id)}));
   const category=({top:'Tops',bottom:'Bottoms',shoe:'Shoes',outer:'Outerwear'})[type];
-  const closet=state.items.filter(x=>x.category===category&&!x.demo).slice(0,10).map(x=>({
+  const closet=state.items.filter(x=>x.category===category&&ThreadlineDiscovery.validItem(x)).map(x=>({
     id:'closet:'+x.id,type,kind:x.kind||'',name:x.name,color:x.color||'neutral',
     price:0,owned:true,tags:x.tags||[],fit:x.fit||'',store:'Your closet'
   }));
   return [...closet,...catalog];
 }
 function priceOf(items){return items.reduce((sum,p)=>sum+(p.owned?0:Number(p.price)||0),0)}
-function colorHarmony(items){
-  const colors=items.map(x=>String(x.color||'').toLowerCase()).filter(Boolean);
-  const uniq=new Set(colors);
-  const neutrals=new Set(['black','white','gray','grey','navy','cream','beige','brown','denim','khaki','olive']);
-  let score=3;
-  if(uniq.size<=3)score+=3;
-  if(uniq.size===1)score+=1;
-  score+=colors.filter(c=>neutrals.has(c)).length*0.5;
-  return score;
+function selectCandidate(options={}){
+ const ref=shopReference();
+ return ThreadlineDiscovery.choose({rosters:Object.fromEntries(['top','bottom','shoe','outer'].map(t=>[t,roster(t)])),
+  budget:Number(shopState.budget)||0,ratings:shopState.ratings,recent:shopState.recent||[],current:shopLineIds(),
+  accepted:options.accepted||[],creativity:state.prefs.v16Creativity,match:p=>Math.min(10,matchProductToReference(p,ref))});
 }
-function learnedScore(items){
-  const ids=new Set(items.map(p=>p.id));
-  const rated=shopState.ratings.slice(-130);
-  let score=0, examples=0;
-  for(const r of rated){
-    if(!Array.isArray(r.items))continue;
-    const overlap=r.items.filter(id=>ids.has(id)).length;
-    if(overlap===0)continue;
-    const weight=r.rating==='love'?0.9:r.rating==='maybe'?0.18:r.rating==='skip'?-0.9:0;
-    score+=weight*(overlap+(overlap>=2?1.2:0));
-    examples++;
-  }
-  return Math.max(-9,Math.min(9,score/Math.max(1,Math.sqrt(examples))));
-}
-function scoreCandidate(items,ref,budget){
-  const price=priceOf(items);
-  const reference=ref?items.reduce((sum,p)=>sum+matchProductToReference(p,ref),0):0;
-  const rating=learnedScore(items);
-  const fitNotes=items.filter(x=>/relax|loose|wide|oversized/i.test(String(x.fit))).length;
-  let score=11+colorHarmony(items)+Math.min(18,reference*0.40)+rating;
-  // Favor variety and layering, without making either mandatory.
-  score+=new Set(items.flatMap(x=>(x.tags||[]).slice(0,2))).size*0.24;
-  score+=fitNotes>0&&fitNotes<items.length?1.1:0;
-  if(items.length===4)score+=0.4;
-  if(budget>0)score+=price<=budget?Math.max(0,2-(price/budget)): -Math.min(18,(price-budget)/Math.max(budget,25)*12);
-  // Explore first; learning is a gentle influence, not a lock onto preset styles.
-  score+=(Math.random()-0.5)*8;
-  return {items,ids:items.map(p=>p.id),price,score,signature:sig(items.map(p=>p.id))};
-}
-function generatedName(items){
-  const top=items.find(p=>p.type==='top'),bottom=items.find(p=>p.type==='bottom');
-  const outer=items.find(p=>p.type==='outer'),shoe=items.find(p=>p.type==='shoe');
-  const colors=[...new Set(items.map(x=>x.color).filter(Boolean))];
-  const colorDescription=colors.slice(0,2).map(x=>x[0].toUpperCase()+x.slice(1)).join(' & ');
-  const kind=outer?.kind||top?.kind||'Mixed wardrobe';
-  const cap=String(kind).replace(/\b\w/g,x=>x.toUpperCase());
-  return colorDescription?cap+' · '+colorDescription:cap+' · Mixed textures';
-}
-function generatedDescription(items){
-  const top=items.find(p=>p.type==='top'),bottom=items.find(p=>p.type==='bottom');
-  const outer=items.find(p=>p.type==='outer'),shoe=items.find(p=>p.type==='shoe');
-  const pieces=[outer?.name,top?.name,bottom?.name,shoe?.name].filter(Boolean);
-  return 'A fresh combination of '+pieces.join(', ')+'. The proportions, colors and mix of garments are intended as a starting point—swap anything to make it yours.';
-}
-function selectCandidate(){
-  const tops=roster('top'),bottoms=roster('bottom'),shoes=roster('shoe');
-  const outerwear=[null,...roster('outer')];
-  const rated=new Set(shopState.ratings.map(r=>r.signature));
-  const recent=new Set(shopState.recent||[]);
-  const current=sig(shopLineIds());
-  const ref=shopReference(),budget=Number(shopState.budget)||0;
-  const under=[],over=[];
-  let cheapest=Infinity,scanned=0;
-  for(const top of tops)for(const bottom of bottoms)for(const shoe of shoes)for(const outer of outerwear){
-    const items=outer?[outer,top,bottom,shoe]:[top,bottom,shoe];
-    const signature=sig(items.map(p=>p.id));
-    if(rated.has(signature)||signature===current)continue;
-    const candidate=scoreCandidate(items,ref,budget);
-    scanned++;
-    if(candidate.price<cheapest)cheapest=candidate.price;
-    const list=candidate.price<=budget?under:over;
-    if(recent.has(signature))candidate.score-=30;
-    list.push(candidate);
-  }
-  const candidates=under.length?under:over;
-  if(!candidates.length)return null;
-  candidates.sort(under.length?(a,b)=>b.score-a.score||(a.price-b.price):(a,b)=>a.price-b.price||b.score-a.score);
-  // If nothing fits the limit, prioritize the cheapest alternatives rather than pretending we found a budget match.
-  // After a large session, older *unrated* looks can be explored again.
-  const window=candidates.slice(0,Math.min(under.length?22:4,candidates.length));
-  const pick=under.length?window[Math.floor(Math.pow(Math.random(),1.6)*window.length)]:window[0];
-  return {pick,withinBudget:under.length>0,cheapest,scanned};
-}
-shopGenerateInspired=function(){
-  const found=selectCandidate();
+shopGenerateInspired=function(options={}){
+  const found=selectCandidate(options);
   if(!found){
-    toast('Every available catalog combination has been rated. Add new wardrobe pieces or expand the product catalog.');
+    if(!options.silent)toast('No sufficiently different combination is available. Review wardrobe labels or add different garment types.');
     return null;
   }
   const {pick,withinBudget,cheapest}=found;
   const oldId=shopState.selected;
   shopState.selected='discovery';
   shopState.customLook={
-    id:'discovery',name:generatedName(pick.items),
+    id:'discovery',name:ThreadlineDiscovery.describe(pick.items).name,
     tagline:withinBudget?'A new combination within your selected shopping budget':'Closest fresh looks using the available catalog',
-    formula:generatedDescription(pick.items),pieces:pick.ids
+    formula:ThreadlineDiscovery.describe(pick.items).why,pieces:pick.ids
   };
   // Swaps are stored under a stable discovery key; generated combinations replace the previous suggestion.
   shopState.swaps.discovery=pick.ids;
@@ -146,7 +69,7 @@ shopGenerateInspired=function(){
   shopState.generation=(shopState.generation||0)+1;
   shopState.recent=[...(shopState.recent||[]),pick.signature].slice(-65);
   shopStore();
-  if(!withinBudget){
+  if(!withinBudget&&!options.silent){
     toast('No unrated combination is within '+shopMoney(shopState.budget)+'. Lowest available estimate: '+shopMoney(cheapest)+'. Your displayed look may exceed the limit.');
   }
   return shopState.customLook;
