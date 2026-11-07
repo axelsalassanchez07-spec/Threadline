@@ -162,8 +162,11 @@ el('bulk-ai')?.addEventListener('click',async()=>{
  const chosen=drafts.filter(x=>selectedDrafts.has(x.id));
  if(!chosen.length)return feedback('Select a few photos to analyze.',true);
  if(chosen.length>5)return feedback('Analyze at most five images per batch to control paid API use.',true);
- if(!confirm('Send '+chosen.length+' selected compressed clothing photos to the AI provider through your authenticated Supabase function? This uses paid API calls. Results stay editable and are NOT saved automatically.'))return;
- const btn=el('bulk-ai');btn.disabled=true;let success=0,failed=0;
+ const btn=el('bulk-ai');btn.disabled=true;btn.textContent='Checking AI service…';
+ try{await checkVisionReadiness();}catch(err){btn.disabled=false;btn.textContent='Analyze selected with AI';return feedback('AI not ready: '+(err.message||err)+'. Manual batch review still works.',true);}
+ btn.disabled=false;btn.textContent='Analyze selected with AI';
+ if(!confirm('The AI service is ready. Send '+chosen.length+' compressed clothing photos to the provider? This will use paid API calls and return editable drafts only.'))return;
+ btn.disabled=true;let success=0,failed=0;
  try{
   for(let i=0;i<chosen.length;i++){
    btn.textContent='Analyzing '+(i+1)+'/'+chosen.length+'…';
