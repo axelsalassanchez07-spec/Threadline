@@ -1,14 +1,14 @@
-/* THREADLINE V1.6 LAB — isolated browser-only workspace. Nothing is sent to Supabase. */
+/* THREADLINE V1.6 LAB — local IndexedDB workspace. Selected photos are sent externally ONLY after explicit opt-in to AI analysis; no automatic cloud upload. */
 export const STORE='threadline_v16_lab_records';
 export const CATEGORIES=['Tops','Outerwear','Bottoms','Shoes','Accessories'];
-export const COLORS=['black','white','cream','gray','charcoal','navy','blue','brown','beige','tan','olive','green','burgundy','red'];
+export const COLORS=['Unknown','black','white','cream','gray','charcoal','navy','blue','brown','beige','tan','olive','green','burgundy','red','multicolor'];
 export const FITS=['Unknown','Regular','Relaxed','Straight','Oversized','Structured'];
 export const TYPES={
- Tops:['tee','graphic tee','oxford shirt','button-up','rugby shirt','knit polo','hoodie','sweater','shirt','other top'],
- Outerwear:['chore jacket','denim jacket','bomber jacket','leather jacket','blazer','cardigan','track jacket','coat','overshirt','other layer'],
- Bottoms:['jeans','wide-leg trousers','pleated trousers','chinos','cargo pants','shorts','skirt','other bottoms'],
- Shoes:['retro sneakers','sneakers','loafers','boots','dress shoes','sandals','other shoes'],
- Accessories:['cap','hat','belt','bag','watch','scarf','other accessory']
+ Tops:['tee','graphic tee','long-sleeve tee','jersey','rugby shirt','polo shirt','knit polo','oxford shirt','dress shirt','button-up','tank top','turtleneck','hoodie','sweatshirt','sweater','vest','shirt','other top'],
+ Outerwear:['chore jacket','denim jacket','bomber jacket','leather jacket','blazer','cardigan','track jacket','windbreaker','raincoat','puffer jacket','coat','overshirt','other layer'],
+ Bottoms:['jeans','wide-leg trousers','pleated trousers','dress trousers','chinos','cargo pants','joggers','sweatpants','track pants','shorts','cargo shorts','skirt','other bottoms'],
+ Shoes:['retro sneakers','running sneakers','sneakers','loafers','boots','dress boots','dress shoes','sandals','slides','clogs','other shoes'],
+ Accessories:['cap','beanie','hat','belt','bag','backpack','watch','scarf','sunglasses','other accessory']
 };
 export const THEMES=['relaxed','structured','oversized','cropped','wide-leg','tailored','layered','minimal','vintage','workwear','sporty','streetwear','preppy','formal','earth tones','monochrome','contrasting colors','textured','denim','technical','experimental'];
 export const el=id=>document.getElementById(id);
