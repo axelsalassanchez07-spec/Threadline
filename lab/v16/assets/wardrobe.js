@@ -1,5 +1,5 @@
 import {records,save,erase,photo,guessFilename,CATEGORIES,COLORS,FITS,TYPES,esc,uid,el,feedback,options,initNav} from './shared.js';
-import {classifyGarment} from './vision-client.js';
+import {classifyGarment,checkVisionReadiness} from './vision-client.js';
 initNav('wardrobe');
 let drafts=[];
 let busy=false;
@@ -12,20 +12,30 @@ function assignVision(row,result){const category=CATEGORIES.includes(result.cate
 const nameFromFile=n=>n.replace(/\.[^.]+$/,'');
 const field=(label,html)=>'<div class="field"><label>'+label+'</label>'+html+'</div>';
 function draftCard(item){
- const select=(key,values)=>'<select data-field="'+key+'">'+(key==='category'?'<option value="">Choose category</option>':key==='kind'?'<option value="">Choose type</option>':'')+options(values,item[key])+'</select>';
+ const valid=!!item.category&&!!TYPES[item.category]?.includes(item.kind);
+ const checked=valid&&(item.categoryConfirmedByUser||item.verifiedCategory===true);
+ const select=(key,values)=>'<select data-field="'+key+'">'+
+  (key==='category'?'<option value="">Choose category</option>':key==='kind'?'<option value="">Choose type</option>':'')+options(values,item[key])+'</select>';
  return '<article class="review-item" data-draft="'+esc(item.id)+'"><div class="review-top">'+
-   '<img class="thumb" src="'+item.image+'" alt="Uploaded garment">'+
-   '<div><strong>'+esc(item.name)+'</strong><p class="small">'+(item.uncertain?'Not recognized: choose category and type.':'Filename hints available: verify this item.')+'</p>'+
-   '<span class="pill">Approximate pixel sample: '+esc(item.estimatedColor||'unavailable')+' (background may affect it)'+'</span></div></div>'+
-   '<div class="review-quickbar"><label><input type="checkbox" data-pick="1" '+(selectedDrafts.has(item.id)?'checked':'')+'> Select for batch actions</label><div class="tagset">'+CATEGORIES.map(cat=>'<button type="button" data-quick-category="'+esc(cat)+'" class="'+(item.category===cat?'active':'')+'">'+esc(cat)+'</button>').join('')+'</div></div>'+ 
- '<div class="field-grid">'+
-   field('Name','<input data-field="name" value="'+esc(item.name)+'" maxlength="70"><button class="button-quiet" type="button" data-rename="1">Suggest name from selected type</button>')+
-   field('Category',select('category',CATEGORIES))+
-   field('Type',select('kind',TYPES[item.category]||[]))+
-   field('Color',select('color',COLORS))+
-   field('Fit',select('fit',FITS))+
-   field('Style notes (optional)','<input data-field="tags" value="'+esc((item.tags||[]).join(', '))+'" placeholder="e.g. casual, cropped, layered">')+
-   '</div><label class="row" style="margin:10px 0;font-size:12px;font-weight:650"><input type="checkbox" data-confirm="1" '+((item.categoryConfirmedByUser||item.verifiedCategory===true)?'checked':'')+' style="width:16px;height:16px;accent-color:#395b40"> I checked this category and type against the photo</label><div class="row between" style="margin-top:12px"><span class="small">Verify before saving</span><div class="row"><button type="button" class="button-outline" data-ai="'+esc(item.id)+'">✨ Analyze with AI</button><button class="button-quiet" data-discard="'+item.id+'">Remove</button><button class="button-outline" data-save-one="'+item.id+'">Save item</button></div></div></article>';
+  '<img class="thumb" src="'+item.image+'" alt="Uploaded garment">'+
+  '<div><strong>'+esc(item.name)+'</strong><p class="small">'+(item.uncertain?'Uncertain category; please confirm it.':'Filename hint or reviewed category; check photo.')+'</p>'+
+  '<span class="pill">Approximate pixel sample: '+esc(item.estimatedColor||'unavailable')+' (background may affect it)</span>'+
+  (item.visionNote?'<p class="small"><strong>AI explanation:</strong> '+esc(item.visionNote)+'</p>':'')+'</div></div>'+
+  '<div class="review-quickbar"><label><input type="checkbox" data-pick="1" '+(selectedDrafts.has(item.id)?'checked':'')+'> Select for batch actions</label><div class="tagset">'+
+  CATEGORIES.map(cat=>'<button type="button" data-quick-category="'+esc(cat)+'" class="'+(item.category===cat?'active':'')+'">'+esc(cat)+'</button>').join('')+'</div></div>'+
+  '<div class="field-grid">'+
+  field('Name','<input data-field="name" value="'+esc(item.name)+'" maxlength="70"><button type="button" class="button-quiet" data-rename="1">Suggest name from selected type</button>')+
+  field('Category',select('category',CATEGORIES))+
+  field('Type',select('kind',TYPES[item.category]||[]))+
+  field('Color',select('color',COLORS))+
+  field('Fit',select('fit',FITS))+
+  field('Style notes (optional)','<input data-field="tags" value="'+esc((item.tags||[]).join(', '))+'" placeholder="e.g. casual, cropped, layered">')+
+  '</div><label class="row" style="margin:10px 0;font-size:12px;font-weight:650"><input type="checkbox" data-confirm="1" '+(checked?'checked':'')+(valid?'':'disabled')+' style="width:16px;height:16px;accent-color:#395b40"> I checked the category and type against the photo</label>'+
+  '<div class="row between" style="margin-top:12px"><span class="small">Verify before saving</span><div class="row">'+
+  '<button type="button" class="button-outline" data-ai="'+esc(item.id)+'">✨ Analyze with AI</button>'+
+  '<button type="button" class="button-quiet" data-discard="'+esc(item.id)+'">Remove</button>'+
+  '<button type="button" class="button-outline" data-save-one="'+esc(item.id)+'">Save item</button></div></div>'+
+  '<p class="small" data-ai-message role="status" aria-live="polite"></p></article>';
 }
 function showDrafts(){
  el('draft-heading').textContent=drafts.length?'Review '+drafts.length+' clothing draft'+(drafts.length===1?'':'s'):'Upload clothing photos';
