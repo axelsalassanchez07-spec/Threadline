@@ -61,6 +61,7 @@ Deno.serve(async request=>{
  if(!data.user.email||!allow.includes(data.user.email.toLowerCase()))return reply({error:"This vision preview is restricted to approved testers."},403);
  let body:Record<string,unknown>;
  try{body=await request.json() as Record<string,unknown>;}catch{return reply({error:"Malformed JSON body."},400);}
+ if(body?.task==="status")return reply({ready:Boolean(Deno.env.get("OPENAI_API_KEY")),status:Deno.env.get("OPENAI_API_KEY")?"configured":"missing-provider-key"});
  const task=body?.task;
  if(typeof task!=="string"||!["garment","inspiration"].includes(task))return reply({error:"Unknown analysis task."},400);
  const image=body?.image;
