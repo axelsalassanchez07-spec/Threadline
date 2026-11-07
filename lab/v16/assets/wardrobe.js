@@ -22,7 +22,7 @@ function draftCard(item){
    field('Name','<input data-field="name" value="'+esc(item.name)+'" maxlength="70"><button class="button-quiet" type="button" data-rename="1">Suggest name from selected type</button>')+
    field('Category',select('category',CATEGORIES))+
    field('Type',select('kind',TYPES[item.category]||[]))+
-   field('Color',select('color',['Unknown',...COLORS]))+
+   field('Color',select('color',COLORS))+
    field('Fit',select('fit',FITS))+
    field('Style notes (optional)','<input data-field="tags" value="'+esc((item.tags||[]).join(', '))+'" placeholder="e.g. casual, cropped, layered">')+
    '</div><label class="row" style="margin:10px 0;font-size:12px;font-weight:650"><input type="checkbox" data-confirm="1" '+((item.categoryConfirmedByUser||item.verifiedCategory===true)?'checked':'')+' style="width:16px;height:16px;accent-color:#395b40"> I checked this category and type against the photo</label><div class="row between" style="margin-top:12px"><span class="small">Verify before saving</span><div class="row"><button type="button" class="button-outline" data-ai="'+esc(item.id)+'">✨ Analyze with AI</button><button class="button-quiet" data-discard="'+item.id+'">Remove</button><button class="button-outline" data-save-one="'+item.id+'">Save item</button></div></div></article>';
