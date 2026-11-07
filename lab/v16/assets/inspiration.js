@@ -31,7 +31,7 @@ async function paintPatterns(){
  el('inspo-count').textContent=data.length+' references';
  const max=Math.max(1,...tally.map(x=>x.count));
  el('pattern-panel').innerHTML=tally.length?
-  '<p class="small">Patterns across your saved notes and selected cues, not automatic visual AI analysis.</p>'+tally.slice(0,12).map(x=>
+  '<p class="small">Patterns across saved tags and notes, including any AI photo cues you explicitly reviewed and saved.</p>'+tally.slice(0,12).map(x=>
     '<div class="signal"><span>'+esc(x.label)+'</span><span class="small">'+x.count+' of '+data.length+'</span></div><div class="bar" style="margin:-3px 0 13px"><div style="width:'+Math.round(x.count/data.length*100)+'%"></div></div>'
   ).join(''):'<div class="empty">Your recurring inspiration signals will appear here after you tag a few looks.</div>';
  el('saved-grid').innerHTML=data.length?data.map(row=>
@@ -44,7 +44,7 @@ async function load(files){
  busy=true;el('files').disabled=true;let success=0,failed=0;
  for(const file of list){
   try{
-   const p=await photo(file);
+   const p=await photo(file,1050);
    drafts.push({id:'inspo:'+uid(),name:file.name.replace(/\.[^.]+$/,'').replace(/[_-]/g,' ').slice(0,70)||'Inspiration',
      notes:'',tags:[],estimatedColor:p.estimatedColor,image:p.src,createdAt:Date.now()});success++;
   }catch(e){failed++;}
